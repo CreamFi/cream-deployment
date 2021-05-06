@@ -16,7 +16,7 @@ async function main() {
   const CrBUSD = await hre.ethers.getContractFactory("CErc20Delegator");
 
   // Pre-deployed contracts
-  const comptrollerImpl = Comptroller.attach("0x031339660fbd74Cf9903ab819A5e4D6bE7a053c7");
+  const comptrollerImpl = Comptroller.attach("0x028337c13489DFf71f8afE9aa9D1D17969aA48b3");
   const interestRateModel = InterestRateModel.attach("0x54eCE7a254583D51935E9cec498CE9f971F45043");
   const crTokenImpl = CrTokenImpl.attach("0x1cB4e063e0Fd957BDB2B24134ee9577AB65eA878");
 
