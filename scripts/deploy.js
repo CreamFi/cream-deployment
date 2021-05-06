@@ -11,14 +11,14 @@ async function main() {
   const Comptroller = await hre.ethers.getContractFactory("Comptroller");
   const InterestRateModel = await hre.ethers.getContractFactory("JumpRateModelV2");
   const PriceOracle = await hre.ethers.getContractFactory("SimplePriceOracle");
-  const CrBNB = await hre.ethers.getContractFactory("CEther");
-  const CrTokenImpl = await hre.ethers.getContractFactory("CErc20Delegate");
-  const CrBUSD = await hre.ethers.getContractFactory("CErc20Delegator");
+  const CrETH = await hre.ethers.getContractFactory("CEther");
+  // const CrTokenImpl = await hre.ethers.getContractFactory("CErc20Delegate");
+  // const CrBUSD = await hre.ethers.getContractFactory("CErc20Delegator");
 
   // Pre-deployed contracts
-  const comptrollerImpl = Comptroller.attach("0x028337c13489DFf71f8afE9aa9D1D17969aA48b3");
-  const interestRateModel = InterestRateModel.attach("0x54eCE7a254583D51935E9cec498CE9f971F45043");
-  const crTokenImpl = CrTokenImpl.attach("0x1cB4e063e0Fd957BDB2B24134ee9577AB65eA878");
+  const comptrollerImpl = Comptroller.attach("0x699ea595932e6e43158374710ef6b70eaf601fef");
+  const interestRateModel = InterestRateModel.attach("0x494F09038E82CA8E5a4C1324c80F9401Bcc138F9");
+  // const crTokenImpl = CrTokenImpl.attach("0x1cB4e063e0Fd957BDB2B24134ee9577AB65eA878");
 
   const unitroller = await Unitroller.deploy();
   const priceOracle = await PriceOracle.deploy();
@@ -40,27 +40,12 @@ async function main() {
   await comptroller._setLiquidationIncentive(parseEther("1.08"));
   await comptroller._setPriceOracle(priceOracle.address);
 
-  const busdPrice = (await axios.get("https://api.coingecko.com/api/v3/simple/price?ids=busd&vs_currencies=bnb")).data.busd.bnb;
-  tx = await priceOracle.setDirectPrice(BUSD_ADDRESS, parseEther(busdPrice.toString()));
+  const crETH = await CrETH.deploy(comptroller.address, interestRateModel.address, "200000000000000000000000000", "Cream ETH", "crETH", 8, ownerAddress);
 
-  const crBNB = await CrBNB.deploy(comptroller.address, interestRateModel.address, "200000000000000000000000000", "Cream BNB", "crBNB", 8, ownerAddress);
-  const crBUSD = await CrBUSD.deploy(BUSD_ADDRESS, comptroller.address, interestRateModel.address, "200000000000000000000000000", "Cream BUSD", "crBUSD", 8, ownerAddress, crTokenImpl.address, "0x");
+  await crETH.deployed();
+  console.log("crETH:", crETH.address);
 
-  await Promise.all([
-    crBNB.deployed(),
-    crBUSD.deployed(),
-  ]);
-  console.log("crBNB:", crBNB.address);
-  console.log("crBUSD:", crBUSD.address);
-
-  await comptroller._supportMarket(crBNB.address);
-  await comptroller._supportMarket(crBUSD.address);
-
-  await comptroller._setCollateralFactor(crBNB.address, parseEther('0.75'));
-  // price must be set before giving collateral
-  await tx.wait();
-  await comptroller._setCollateralFactor(crBUSD.address, parseEther('0.8'));
-
+  await comptroller._supportMarket(crETH.address);
   console.log('deployment success.');
 }
 
