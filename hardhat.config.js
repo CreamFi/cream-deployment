@@ -19,13 +19,13 @@ module.exports = {
   networks: {
     hardhat: {
       forking: {
-        url: "https://data-seed-prebsc-2-s2.binance.org:8545/"
+        url: "https://kovan5.arbitrum.io/rpc"
       }
     },
-    bsc_testnet: {
-      url: "https://data-seed-prebsc-2-s2.binance.org:8545/",
-      allowUnlimitedContractSize: true,
-      accounts: ["0x<YOUR_PRIVATE_KEY>"]
+    arbitrum: {
+      url: "https://kovan5.arbitrum.io/rpc",
+      gasPrice: 0,
+      accounts: ["0x0"]
     }
   }
 };

@@ -126,17 +126,6 @@ contract CErc20Delegator is CTokenInterface, CErc20Interface, CDelegatorInterfac
     }
 
     /**
-     * @notice Sender repays a borrow belonging to borrower
-     * @param borrower the account with the debt being payed off
-     * @param repayAmount The amount to repay
-     * @return uint 0=success, otherwise a failure (see ErrorReporter.sol for details)
-     */
-    function repayBorrowBehalf(address borrower, uint repayAmount) external returns (uint) {
-        borrower; repayAmount; // Shh
-        delegateAndReturn();
-    }
-
-    /**
      * @notice The sender liquidates the borrowers collateral.
      *  The collateral seized is transferred to the liquidator.
      * @param borrower The borrower of this cToken to be liquidated
@@ -146,14 +135,6 @@ contract CErc20Delegator is CTokenInterface, CErc20Interface, CDelegatorInterfac
      */
     function liquidateBorrow(address borrower, uint repayAmount, CTokenInterface cTokenCollateral) external returns (uint) {
         borrower; repayAmount; cTokenCollateral; // Shh
-        delegateAndReturn();
-    }
-
-    /**
-     * @notice Gulps excess contract cash to reserves
-     * @dev This function calculates excess ERC20 gained from a ERC20.transfer() call and adds the excess to reserves.
-     */
-    function gulp() external {
         delegateAndReturn();
     }
 
@@ -201,14 +182,6 @@ contract CErc20Delegator is CTokenInterface, CErc20Interface, CDelegatorInterfac
      */
     function allowance(address owner, address spender) external view returns (uint) {
         owner; spender; // Shh
-        delegateToViewAndReturn();
-    }
-
-    /**
-     * @notice Get the bep token owner
-     * @return The owner of token
-     */
-    function getOwner() external view returns (address) {
         delegateToViewAndReturn();
     }
 

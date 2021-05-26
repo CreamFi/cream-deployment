@@ -4,11 +4,10 @@ pragma solidity ^0.5.16;
  * @title ERC 20 Token Standard Interface
  *  https://eips.ethereum.org/EIPS/eip-20
  */
-interface BEP20Interface {
+interface EIP20Interface {
     function name() external view returns (string memory);
     function symbol() external view returns (string memory);
     function decimals() external view returns (uint8);
-    function getOwner() external view returns (address);
 
     /**
       * @notice Get the total number of tokens in circulation
