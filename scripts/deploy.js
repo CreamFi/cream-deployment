@@ -19,6 +19,7 @@ async function main() {
   const comptrollerImpl = Comptroller.attach("0x028337c13489DFf71f8afE9aa9D1D17969aA48b3");
   const interestRateModel = InterestRateModel.attach("0x54eCE7a254583D51935E9cec498CE9f971F45043");
   const crTokenImpl = CrTokenImpl.attach("0x1cB4e063e0Fd957BDB2B24134ee9577AB65eA878");
+  const cCapableErc20Delegate = CrTokenImpl.attach("0xC977C6427f255D0Ec38dA7fc6b46ecd9640eA2bF"); // with flashloan feature
 
   const unitroller = await Unitroller.deploy();
   const priceOracle = await PriceOracle.deploy();
