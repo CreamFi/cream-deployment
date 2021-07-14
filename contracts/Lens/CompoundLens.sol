@@ -3,15 +3,17 @@ pragma experimental ABIEncoderV2;
 
 import "../CErc20.sol";
 import "../CToken.sol";
+import "../CTokenInterfaces.sol";
 import "../PriceOracle.sol";
-import "../BEP20Interface.sol";
+import "../EIP20Interface.sol";
 import "../Governance/Comp.sol";
 
 interface ComptrollerLensInterface {
-    function markets(address) external view returns (bool, uint);
+    function markets(address) external view returns (bool, uint, bool, uint);
     function oracle() external view returns (PriceOracle);
     function getAccountLiquidity(address) external view returns (uint, uint, uint);
     function getAssetsIn(address) external view returns (CToken[] memory);
+    function checkMembership(address account, CToken cToken) external view returns (bool);
     function claimComp(address) external;
     function compAccrued(address) external view returns (uint);
 }
@@ -35,27 +37,37 @@ contract CompoundLens {
         uint totalReserves;
         uint totalSupply;
         uint totalCash;
+        uint totalCollateralTokens;
         bool isListed;
         uint collateralFactorMantissa;
         address underlyingAssetAddress;
         uint cTokenDecimals;
         uint underlyingDecimals;
+        uint version;
+        uint collateralCap;
+        uint underlyingPrice;
     }
 
-    function cTokenMetadata(CToken cToken) public returns (CTokenMetadata memory) {
+    function cTokenMetadataInternal(CToken cToken, ComptrollerLensInterface comptroller, PriceOracle priceOracle) internal returns (CTokenMetadata memory) {
         uint exchangeRateCurrent = cToken.exchangeRateCurrent();
-        ComptrollerLensInterface comptroller = ComptrollerLensInterface(address(cToken.comptroller()));
-        (bool isListed, uint collateralFactorMantissa) = comptroller.markets(address(cToken));
+        (bool isListed, uint collateralFactorMantissa, , uint version) = comptroller.markets(address(cToken));
         address underlyingAssetAddress;
         uint underlyingDecimals;
+        uint collateralCap;
+        uint totalCollateralTokens;
 
-        if (compareStrings(cToken.symbol(), "crBNB")) {
+        if (compareStrings(cToken.symbol(), "crETH")) {
             underlyingAssetAddress = address(0);
             underlyingDecimals = 18;
         } else {
             CErc20 cErc20 = CErc20(address(cToken));
             underlyingAssetAddress = cErc20.underlying();
-            underlyingDecimals = BEP20Interface(cErc20.underlying()).decimals();
+            underlyingDecimals = EIP20Interface(cErc20.underlying()).decimals();
+        }
+
+        if (version == 1) {
+            collateralCap = CCollateralCapErc20Interface(address(cToken)).collateralCap();
+            totalCollateralTokens = CCollateralCapErc20Interface(address(cToken)).totalCollateralTokens();
         }
 
         return CTokenMetadata({
@@ -68,19 +80,33 @@ contract CompoundLens {
             totalReserves: cToken.totalReserves(),
             totalSupply: cToken.totalSupply(),
             totalCash: cToken.getCash(),
+            totalCollateralTokens: totalCollateralTokens,
             isListed: isListed,
             collateralFactorMantissa: collateralFactorMantissa,
             underlyingAssetAddress: underlyingAssetAddress,
             cTokenDecimals: cToken.decimals(),
-            underlyingDecimals: underlyingDecimals
+            underlyingDecimals: underlyingDecimals,
+            version: version,
+            collateralCap: collateralCap,
+            underlyingPrice: priceOracle.getUnderlyingPrice(cToken)
         });
+    }
+
+    function cTokenMetadata(CToken cToken) public returns (CTokenMetadata memory) {
+        ComptrollerLensInterface comptroller = ComptrollerLensInterface(address(cToken.comptroller()));
+        PriceOracle priceOracle = comptroller.oracle();
+        return cTokenMetadataInternal(cToken, comptroller, priceOracle);
     }
 
     function cTokenMetadataAll(CToken[] calldata cTokens) external returns (CTokenMetadata[] memory) {
         uint cTokenCount = cTokens.length;
+        require(cTokenCount > 0, "invalid input");
         CTokenMetadata[] memory res = new CTokenMetadata[](cTokenCount);
+        ComptrollerLensInterface comptroller = ComptrollerLensInterface(address(cTokens[0].comptroller()));
+        PriceOracle priceOracle = comptroller.oracle();
         for (uint i = 0; i < cTokenCount; i++) {
-            res[i] = cTokenMetadata(cTokens[i]);
+            require(address(comptroller) == address(cTokens[i].comptroller()), "mismatch comptroller");
+            res[i] = cTokenMetadataInternal(cTokens[i], comptroller, priceOracle);
         }
         return res;
     }
@@ -92,23 +118,32 @@ contract CompoundLens {
         uint balanceOfUnderlying;
         uint tokenBalance;
         uint tokenAllowance;
+        uint collateralBalance;
+        uint nativeTokenBalance;
     }
 
     function cTokenBalances(CToken cToken, address payable account) public returns (CTokenBalances memory) {
         uint balanceOf = cToken.balanceOf(account);
         uint borrowBalanceCurrent = cToken.borrowBalanceCurrent(account);
         uint balanceOfUnderlying = cToken.balanceOfUnderlying(account);
+        address comptroller = address(cToken.comptroller());
         uint tokenBalance;
         uint tokenAllowance;
+        uint collateralBalance;
+        uint nativeTokenBalance = account.balance;
 
-        if (compareStrings(cToken.symbol(), "crBNB")) {
-            tokenBalance = account.balance;
-            tokenAllowance = account.balance;
+        if (compareStrings(cToken.symbol(), "crETH")) {
+            tokenBalance = nativeTokenBalance;
+            tokenAllowance = nativeTokenBalance;
         } else {
             CErc20 cErc20 = CErc20(address(cToken));
-            BEP20Interface underlying = BEP20Interface(cErc20.underlying());
+            EIP20Interface underlying = EIP20Interface(cErc20.underlying());
             tokenBalance = underlying.balanceOf(account);
             tokenAllowance = underlying.allowance(account, address(cToken));
+        }
+
+        if (ComptrollerLensInterface(comptroller).checkMembership(account, cToken)) {
+            (, collateralBalance, , ) = cToken.getAccountSnapshot(account);
         }
 
         return CTokenBalances({
@@ -117,7 +152,9 @@ contract CompoundLens {
             borrowBalanceCurrent: borrowBalanceCurrent,
             balanceOfUnderlying: balanceOfUnderlying,
             tokenBalance: tokenBalance,
-            tokenAllowance: tokenAllowance
+            tokenAllowance: tokenAllowance,
+            collateralBalance: collateralBalance,
+            nativeTokenBalance: nativeTokenBalance
         });
     }
 
@@ -228,9 +265,9 @@ contract CompoundLens {
         uint cTokenCount = cTokens.length;
         uint[] memory rewards = new uint[](cTokenCount);
         for (uint i = 0; i < cTokenCount; i++) {
-            uint balanceBefore = BEP20Interface(sushi).balanceOf(account);
+            uint balanceBefore = EIP20Interface(sushi).balanceOf(account);
             cTokens[i].claimSushi(account);
-            uint balanceAfter = BEP20Interface(sushi).balanceOf(account);
+            uint balanceAfter = EIP20Interface(sushi).balanceOf(account);
             rewards[i] = sub(balanceAfter, balanceBefore, "subtraction underflow");
         }
         return rewards;
@@ -240,9 +277,9 @@ contract CompoundLens {
         uint cTokenCount = cTokens.length;
         uint[] memory rewards = new uint[](cTokenCount);
         for (uint i = 0; i < cTokenCount; i++) {
-            uint balanceBefore = BEP20Interface(comp).balanceOf(account);
+            uint balanceBefore = EIP20Interface(comp).balanceOf(account);
             cTokens[i].claimComp(account);
-            uint balanceAfter = BEP20Interface(comp).balanceOf(account);
+            uint balanceAfter = EIP20Interface(comp).balanceOf(account);
             rewards[i] = sub(balanceAfter, balanceBefore, "subtraction underflow");
         }
         return rewards;

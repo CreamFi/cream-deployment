@@ -1,4 +1,5 @@
 require("@nomiclabs/hardhat-waffle");
+require("@nomiclabs/hardhat-etherscan");
 
 // You need to export an object to set up your config
 // Go to https://hardhat.org/config/ to learn more
@@ -17,15 +18,12 @@ module.exports = {
     }
   },
   networks: {
-    hardhat: {
-      forking: {
-        url: "https://data-seed-prebsc-2-s2.binance.org:8545/"
-      }
-    },
-    bsc_testnet: {
-      url: "https://data-seed-prebsc-2-s2.binance.org:8545/",
-      allowUnlimitedContractSize: true,
-      accounts: ["0x<YOUR_PRIVATE_KEY>"]
+    rinkeby: {
+      url: "https://rinkeby.infura.io/v3/<PROJECT_ID>",
+      accounts: ["0x_PRIVATE_KEY"]
     }
+  },
+  etherscan: {
+    apiKey: "API_KEY"
   }
 };

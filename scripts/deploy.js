@@ -1,8 +1,11 @@
 const hre = require("hardhat");
 const axios = require("axios");
+const { parseUnits } = require("ethers/lib/utils");
 
 const parseEther = hre.ethers.utils.parseEther;
-const BUSD_ADDRESS = "0xeD24FC36d5Ee211Ea25A80239Fb8C4Cfd80f12Ee";
+
+// TODO: deploy USDC
+const USDC_ADDRESS = "0xD87Ba7A50B2E7E660f678A895E4B72E7CB4CCd9C";
 
 async function main() {
   const ownerAddress = (await hre.ethers.getSigners())[0].address;
@@ -11,15 +14,16 @@ async function main() {
   const Comptroller = await hre.ethers.getContractFactory("Comptroller");
   const InterestRateModel = await hre.ethers.getContractFactory("JumpRateModelV2");
   const PriceOracle = await hre.ethers.getContractFactory("SimplePriceOracle");
-  const CrBNB = await hre.ethers.getContractFactory("CEther");
+  const CrETH = await hre.ethers.getContractFactory("CEther");
   const CrTokenImpl = await hre.ethers.getContractFactory("CErc20Delegate");
-  const CrBUSD = await hre.ethers.getContractFactory("CErc20Delegator");
+  const CrUSDC = await hre.ethers.getContractFactory("CErc20Delegator");
 
   // Pre-deployed contracts
-  const comptrollerImpl = Comptroller.attach("0x028337c13489DFf71f8afE9aa9D1D17969aA48b3");
-  const interestRateModel = InterestRateModel.attach("0x54eCE7a254583D51935E9cec498CE9f971F45043");
-  const crTokenImpl = CrTokenImpl.attach("0x1cB4e063e0Fd957BDB2B24134ee9577AB65eA878");
-  const cCapableErc20Delegate = CrTokenImpl.attach("0xC977C6427f255D0Ec38dA7fc6b46ecd9640eA2bF"); // with flashloan feature
+  // TODO: deploy these contracts and update to the right contract addresses
+  const comptrollerImpl = Comptroller.attach("0x0a76187Cee5FBA5D018e8245dF9D85F1aFC467c3");
+  const interestRateModel = InterestRateModel.attach("0xf16Cd14db1c297ba425b4E58E3c9D056f932f2B4");
+  const crTokenImpl = CrTokenImpl.attach("0x35B6719972d6d4055E8b8C3424f812FC6DEf8AB7");
+  // const cCapableErc20Delegate = CrTokenImpl.attach("0xC977C6427f255D0Ec38dA7fc6b46ecd9640eA2bF"); // with flashloan feature
 
   const unitroller = await Unitroller.deploy();
   const priceOracle = await PriceOracle.deploy();
@@ -41,26 +45,26 @@ async function main() {
   await comptroller._setLiquidationIncentive(parseEther("1.08"));
   await comptroller._setPriceOracle(priceOracle.address);
 
-  const busdPrice = (await axios.get("https://api.coingecko.com/api/v3/simple/price?ids=busd&vs_currencies=bnb")).data.busd.bnb;
-  tx = await priceOracle.setDirectPrice(BUSD_ADDRESS, parseEther(busdPrice.toString()));
+  const usdcPrice = (await axios.get("https://api.coingecko.com/api/v3/simple/price?ids=usd-coin&vs_currencies=eth")).data["usd-coin"].eth;
+  tx = await priceOracle.setDirectPrice(USDC_ADDRESS, parseUnits(usdcPrice.toString(), 18 + 18 - 6));
 
-  const crBNB = await CrBNB.deploy(comptroller.address, interestRateModel.address, "200000000000000000000000000", "Cream BNB", "crBNB", 8, ownerAddress);
-  const crBUSD = await CrBUSD.deploy(BUSD_ADDRESS, comptroller.address, interestRateModel.address, "200000000000000000000000000", "Cream BUSD", "crBUSD", 8, ownerAddress, crTokenImpl.address, "0x");
+  const crETH = await CrETH.deploy(comptroller.address, interestRateModel.address, "200000000000000000000000000", "Cream Ether", "crETH", 8, ownerAddress);
+  const crUSDC = await CrUSDC.deploy(USDC_ADDRESS, comptroller.address, interestRateModel.address, "200000000000000", "Cream USDC", "crUSDC", 8, ownerAddress, crTokenImpl.address, "0x");
 
   await Promise.all([
-    crBNB.deployed(),
-    crBUSD.deployed(),
+    crETH.deployed(),
+    crUSDC.deployed(),
   ]);
-  console.log("crBNB:", crBNB.address);
-  console.log("crBUSD:", crBUSD.address);
+  console.log("crETH:", crETH.address);
+  console.log("crUSDC:", crUSDC.address);
 
-  await comptroller._supportMarket(crBNB.address);
-  await comptroller._supportMarket(crBUSD.address);
+  await comptroller._supportMarket(crETH.address, 0);
+  await comptroller._supportMarket(crUSDC.address, 0);
 
-  await comptroller._setCollateralFactor(crBNB.address, parseEther('0.75'));
+  await comptroller._setCollateralFactor(crETH.address, parseEther('0.75'));
   // price must be set before giving collateral
   await tx.wait();
-  await comptroller._setCollateralFactor(crBUSD.address, parseEther('0.8'));
+  await comptroller._setCollateralFactor(crUSDC.address, parseEther('0.8'));
 
   console.log('deployment success.');
 }
