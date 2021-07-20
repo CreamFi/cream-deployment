@@ -1,5 +1,7 @@
 require("@nomiclabs/hardhat-waffle");
 require("@nomiclabs/hardhat-etherscan");
+require("dotenv").config();
+
 
 // You need to export an object to set up your config
 // Go to https://hardhat.org/config/ to learn more
@@ -19,8 +21,9 @@ module.exports = {
   },
   networks: {
     rinkeby: {
-      url: "https://rinkeby.infura.io/v3/<PROJECT_ID>",
-      accounts: ["0x_PRIVATE_KEY"]
+      url: "https://rinkeby.infura.io/v3/" + process.env.INFURA_TOKEN,
+      chainId: 4,
+      accounts: [`0x${process.env.KOVAN_DEPLOY_PRIVATE_KEY}`],
     }
   },
   etherscan: {
