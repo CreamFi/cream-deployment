@@ -9,14 +9,12 @@ cd cream-deployment
 yarn install
 ```
 
+Setup
+------------
 Copy the example env file to a local .env, and replace the infura project token and private key
 ```
 cp .env_default .env
 ```
-
-Setup
-------------
-Replace `<YOUR_PRIVATE_KEY>` in `hardhat.config.js` with your private key
 
 Deploy
 ------
