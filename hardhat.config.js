@@ -1,4 +1,6 @@
+require("dotenv").config();
 require("@nomiclabs/hardhat-waffle");
+require("@nomiclabs/hardhat-etherscan");
 
 // You need to export an object to set up your config
 // Go to https://hardhat.org/config/ to learn more
@@ -19,13 +21,15 @@ module.exports = {
   networks: {
     hardhat: {
       forking: {
-        url: "https://kovan5.arbitrum.io/rpc"
+        url: "https://arb1.arbitrum.io/rpc"
       }
     },
     arbitrum: {
-      url: "https://kovan5.arbitrum.io/rpc",
-      gasPrice: 0,
-      accounts: ["0x0"]
+      url: "https://arb1.arbitrum.io/rpc",
+      accounts: [`0x${process.env.DEPLOY_PRIVATE_KEY}`]
     }
+  },
+  etherscan: {
+    apiKey: process.env.ETHERSCAN_API_KEY
   }
 };
