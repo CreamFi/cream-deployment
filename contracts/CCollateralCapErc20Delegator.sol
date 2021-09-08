@@ -3,11 +3,11 @@ pragma solidity ^0.5.16;
 import "./CTokenInterfaces.sol";
 
 /**
- * @title Compound's CErc20Delegator Contract
+ * @title Cream's CCollateralCapErc20Delegator Contract
  * @notice CTokens which wrap an EIP-20 underlying and delegate to an implementation
- * @author Compound
+ * @author Cream
  */
-contract CErc20Delegator is CTokenInterface, CErc20Interface, CDelegatorInterface {
+contract CCollateralCapErc20Delegator is CTokenInterface, CCollateralCapErc20Interface, CDelegatorInterface {
     /**
      * @notice Construct a new money market
      * @param underlying_ The address of the underlying asset
@@ -196,6 +196,56 @@ contract CErc20Delegator is CTokenInterface, CErc20Interface, CDelegatorInterfac
     function approve(address spender, uint256 amount) external returns (bool) {
         spender;
         amount; // Shh
+        delegateAndReturn();
+    }
+
+    /**
+     * @notice Gulps excess contract cash to reserves
+     * @dev This function calculates excess ERC20 gained from a ERC20.transfer() call and adds the excess to reserves.
+     */
+    function gulp() external {
+        delegateAndReturn();
+    }
+
+    /**
+     * @notice Flash loan funds to a given account.
+     * @param receiver The receiver address for the funds
+     * @param initiator flash loan initiator
+     * @param amount The amount of the funds to be loaned
+     * @param data The other data
+     * @return uint 0=success, otherwise a failure (see ErrorReporter.sol for details)
+     */
+    function flashLoan(
+        ERC3156FlashBorrowerInterface receiver,
+        address initiator,
+        uint256 amount,
+        bytes calldata data
+    ) external returns (bool) {
+        receiver;
+        initiator;
+        amount;
+        data; // Shh
+        delegateAndReturn();
+    }
+
+    /**
+     * @notice Register account collateral tokens if there is space.
+     * @param account The account to register
+     * @dev This function could only be called by comptroller.
+     * @return The actual registered amount of collateral
+     */
+    function registerCollateral(address account) external returns (uint256) {
+        account; // Shh
+        delegateAndReturn();
+    }
+
+    /**
+     * @notice Unregister account collateral tokens if the account still has enough collateral.
+     * @dev This function could only be called by comptroller.
+     * @param account The account to unregister
+     */
+    function unregisterCollateral(address account) external {
+        account; // Shh
         delegateAndReturn();
     }
 
@@ -420,6 +470,15 @@ contract CErc20Delegator is CTokenInterface, CErc20Interface, CDelegatorInterfac
      */
     function _setInterestRateModel(InterestRateModel newInterestRateModel) public returns (uint256) {
         newInterestRateModel; // Shh
+        delegateAndReturn();
+    }
+
+    /**
+     * @notice Set collateral cap of this market, 0 for no cap
+     * @param newCollateralCap The new collateral cap
+     */
+    function _setCollateralCap(uint256 newCollateralCap) external {
+        newCollateralCap; // Shh
         delegateAndReturn();
     }
 
