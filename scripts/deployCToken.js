@@ -3,7 +3,7 @@ const hre = require("hardhat");
 const parseEther = hre.ethers.utils.parseEther;
 
 async function main() {
-  const adminAddress = "0x197939c1ca20C2b506d6811d8B6CDB3394471074";
+  const adminAddress = "0x5b4058A9000e86fe136Ac896352C4DFD539E32a1";
 
   const CCollateralCapErc20Delegate = await hre.ethers.getContractFactory("CCollateralCapErc20Delegate");
   const cTokenImplementationAddress = (await CCollateralCapErc20Delegate.deploy()).address;
