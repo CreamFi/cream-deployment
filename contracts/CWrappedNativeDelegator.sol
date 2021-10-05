@@ -3,11 +3,11 @@ pragma solidity ^0.5.16;
 import "./CTokenInterfaces.sol";
 
 /**
- * @title Compound's CErc20Delegator Contract
+ * @title Compound's CWrappedNativeDelegator Contract
  * @notice CTokens which wrap an EIP-20 underlying and delegate to an implementation
  * @author Compound
  */
-contract CErc20Delegator is CTokenInterface, CErc20Interface, CDelegatorInterface {
+contract CWrappedNativeDelegator is CTokenInterface, CWrappedNativeInterface, CDelegatorInterface {
     /**
      * @notice Construct a new money market
      * @param underlying_ The address of the underlying asset
@@ -69,7 +69,7 @@ contract CErc20Delegator is CTokenInterface, CErc20Interface, CDelegatorInterfac
         bool allowResign,
         bytes memory becomeImplementationData
     ) public {
-        require(msg.sender == admin, "CErc20Delegator::_setImplementation: Caller must be admin");
+        require(msg.sender == admin, "CWrappedNativeDelegator::_setImplementation: Caller must be admin");
 
         if (allowResign) {
             delegateToImplementation(abi.encodeWithSignature("_resignImplementation()"));
@@ -95,12 +95,32 @@ contract CErc20Delegator is CTokenInterface, CErc20Interface, CDelegatorInterfac
     }
 
     /**
+     * @notice Sender supplies assets into the market and receives cTokens in exchange
+     * @dev Accrues interest whether or not the operation succeeds, unless reverted
+     * @return uint 0=success, otherwise a failure (see ErrorReporter.sol for details)
+     */
+    function mintNative() external payable returns (uint256) {
+        delegateAndReturn();
+    }
+
+    /**
      * @notice Sender redeems cTokens in exchange for the underlying asset
      * @dev Accrues interest whether or not the operation succeeds, unless reverted
      * @param redeemTokens The number of cTokens to redeem into underlying
      * @return uint 0=success, otherwise a failure (see ErrorReporter.sol for details)
      */
     function redeem(uint256 redeemTokens) external returns (uint256) {
+        redeemTokens; // Shh
+        delegateAndReturn();
+    }
+
+    /**
+     * @notice Sender redeems cTokens in exchange for the underlying asset
+     * @dev Accrues interest whether or not the operation succeeds, unless reverted
+     * @param redeemTokens The number of cTokens to redeem into underlying
+     * @return uint 0=success, otherwise a failure (see ErrorReporter.sol for details)
+     */
+    function redeemNative(uint256 redeemTokens) external returns (uint256) {
         redeemTokens; // Shh
         delegateAndReturn();
     }
@@ -117,11 +137,32 @@ contract CErc20Delegator is CTokenInterface, CErc20Interface, CDelegatorInterfac
     }
 
     /**
+     * @notice Sender redeems cTokens in exchange for a specified amount of underlying asset
+     * @dev Accrues interest whether or not the operation succeeds, unless reverted
+     * @param redeemAmount The amount of underlying to redeem
+     * @return uint 0=success, otherwise a failure (see ErrorReporter.sol for details)
+     */
+    function redeemUnderlyingNative(uint256 redeemAmount) external returns (uint256) {
+        redeemAmount; // Shh
+        delegateAndReturn();
+    }
+
+    /**
      * @notice Sender borrows assets from the protocol to their own address
      * @param borrowAmount The amount of the underlying asset to borrow
      * @return uint 0=success, otherwise a failure (see ErrorReporter.sol for details)
      */
     function borrow(uint256 borrowAmount) external returns (uint256) {
+        borrowAmount; // Shh
+        delegateAndReturn();
+    }
+
+    /**
+     * @notice Sender borrows assets from the protocol to their own address
+     * @param borrowAmount The amount of the underlying asset to borrow
+     * @return uint 0=success, otherwise a failure (see ErrorReporter.sol for details)
+     */
+    function borrowNative(uint256 borrowAmount) external returns (uint256) {
         borrowAmount; // Shh
         delegateAndReturn();
     }
@@ -133,6 +174,14 @@ contract CErc20Delegator is CTokenInterface, CErc20Interface, CDelegatorInterfac
      */
     function repayBorrow(uint256 repayAmount) external returns (uint256) {
         repayAmount; // Shh
+        delegateAndReturn();
+    }
+
+    /**
+     * @notice Sender repays their own borrow
+     * @return uint 0=success, otherwise a failure (see ErrorReporter.sol for details)
+     */
+    function repayBorrowNative() external payable returns (uint256) {
         delegateAndReturn();
     }
 
@@ -152,6 +201,43 @@ contract CErc20Delegator is CTokenInterface, CErc20Interface, CDelegatorInterfac
         borrower;
         repayAmount;
         cTokenCollateral; // Shh
+        delegateAndReturn();
+    }
+
+    /**
+     * @notice The sender liquidates the borrowers collateral.
+     *  The collateral seized is transferred to the liquidator.
+     * @param borrower The borrower of this cToken to be liquidated
+     * @param cTokenCollateral The market in which to seize collateral from the borrower
+     * @return uint 0=success, otherwise a failure (see ErrorReporter.sol for details)
+     */
+    function liquidateBorrowNative(address borrower, CTokenInterface cTokenCollateral)
+        external
+        payable
+        returns (uint256)
+    {
+        borrower;
+        cTokenCollateral; // Shh
+        delegateAndReturn();
+    }
+
+    /**
+     * @notice Flash loan funds to a given account.
+     * @param receiver The receiver address for the funds
+     * @param amount The amount of the funds to be loaned
+     * @param data The other data
+     * @return uint 0=success, otherwise a failure (see ErrorReporter.sol for details)
+     */
+
+    function flashLoan(
+        ERC3156FlashBorrowerInterface receiver,
+        address initiator,
+        uint256 amount,
+        bytes calldata data
+    ) external returns (bool) {
+        receiver;
+        amount;
+        data; // Shh
         delegateAndReturn();
     }
 
@@ -403,6 +489,14 @@ contract CErc20Delegator is CTokenInterface, CErc20Interface, CDelegatorInterfac
     }
 
     /**
+     * @notice Accrues interest and adds reserves by transferring from admin
+     * @return uint 0=success, otherwise a failure (see ErrorReporter.sol for details)
+     */
+    function _addReservesNative() external payable returns (uint256) {
+        delegateAndReturn();
+    }
+
+    /**
      * @notice Accrues interest and reduces reserves by transferring to admin
      * @param reduceAmount Amount of reduction to reserves
      * @return uint 0=success, otherwise a failure (see ErrorReporter.sol for details)
@@ -510,8 +604,6 @@ contract CErc20Delegator is CTokenInterface, CErc20Interface, CDelegatorInterfac
      * @dev It returns to the external caller whatever the implementation returns or forwards reverts
      */
     function() external payable {
-        require(msg.value == 0, "CErc20Delegator:fallback: cannot send value to fallback");
-
         // delegate all other functions to current implementation
         delegateAndReturn();
     }

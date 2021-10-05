@@ -4,18 +4,18 @@ import "./InterestRateModel.sol";
 import "./SafeMath.sol";
 
 /**
- * @title Compound's JumpRateModel Contract V2
- * @author Compound (modified by Dharma Labs)
- * @notice Version 2 modifies Version 1 by enabling updateable parameters.
+ * @title CREAM's TripleSlopeRateModel Contract
+ * @author C.R.E.A.M. Finance
  */
-contract JumpRateModelV2 is InterestRateModel {
+contract TripleSlopeRateModel is InterestRateModel {
     using SafeMath for uint256;
 
     event NewInterestParams(
         uint256 baseRatePerBlock,
         uint256 multiplierPerBlock,
         uint256 jumpMultiplierPerBlock,
-        uint256 kink,
+        uint256 kink1,
+        uint256 kink2,
         uint256 roof
     );
 
@@ -50,9 +50,14 @@ contract JumpRateModelV2 is InterestRateModel {
     uint256 public jumpMultiplierPerBlock;
 
     /**
+     * @notice The utilization point at which the interest rate is fixed
+     */
+    uint256 public kink1;
+
+    /**
      * @notice The utilization point at which the jump multiplier is applied
      */
-    uint256 public kink;
+    uint256 public kink2;
 
     /**
      * @notice The utilization point at which the rate is fixed
@@ -64,7 +69,8 @@ contract JumpRateModelV2 is InterestRateModel {
      * @param baseRatePerYear The approximate target base APR, as a mantissa (scaled by 1e18)
      * @param multiplierPerYear The rate of increase in interest rate wrt utilization (scaled by 1e18)
      * @param jumpMultiplierPerYear The multiplierPerBlock after hitting a specified utilization point
-     * @param kink_ The utilization point at which the jump multiplier is applied
+     * @param kink1_ The utilization point at which the interest rate is fixed
+     * @param kink2_ The utilization point at which the jump multiplier is applied
      * @param roof_ The utilization point at which the borrow rate is fixed
      * @param owner_ The address of the owner, i.e. the Timelock contract (which has the ability to update parameters directly)
      */
@@ -72,13 +78,14 @@ contract JumpRateModelV2 is InterestRateModel {
         uint256 baseRatePerYear,
         uint256 multiplierPerYear,
         uint256 jumpMultiplierPerYear,
-        uint256 kink_,
+        uint256 kink1_,
+        uint256 kink2_,
         uint256 roof_,
         address owner_
     ) public {
         owner = owner_;
 
-        updateJumpRateModelInternal(baseRatePerYear, multiplierPerYear, jumpMultiplierPerYear, kink_, roof_);
+        updateTripleRateModelInternal(baseRatePerYear, multiplierPerYear, jumpMultiplierPerYear, kink1_, kink2_, roof_);
     }
 
     /**
@@ -86,19 +93,21 @@ contract JumpRateModelV2 is InterestRateModel {
      * @param baseRatePerYear The approximate target base APR, as a mantissa (scaled by 1e18)
      * @param multiplierPerYear The rate of increase in interest rate wrt utilization (scaled by 1e18)
      * @param jumpMultiplierPerYear The multiplierPerBlock after hitting a specified utilization point
-     * @param kink_ The utilization point at which the jump multiplier is applied
+     * @param kink1_ The utilization point at which the interest rate is fixed
+     * @param kink2_ The utilization point at which the jump multiplier is applied
      * @param roof_ The utilization point at which the borrow rate is fixed
      */
-    function updateJumpRateModel(
+    function updateTripleRateModel(
         uint256 baseRatePerYear,
         uint256 multiplierPerYear,
         uint256 jumpMultiplierPerYear,
-        uint256 kink_,
+        uint256 kink1_,
+        uint256 kink2_,
         uint256 roof_
     ) external {
         require(msg.sender == owner, "only the owner may call this function.");
 
-        updateJumpRateModelInternal(baseRatePerYear, multiplierPerYear, jumpMultiplierPerYear, kink_, roof_);
+        updateTripleRateModelInternal(baseRatePerYear, multiplierPerYear, jumpMultiplierPerYear, kink1_, kink2_, roof_);
     }
 
     /**
@@ -140,11 +149,13 @@ contract JumpRateModelV2 is InterestRateModel {
     ) public view returns (uint256) {
         uint256 util = utilizationRate(cash, borrows, reserves);
 
-        if (util <= kink) {
+        if (util <= kink1) {
             return util.mul(multiplierPerBlock).div(1e18).add(baseRatePerBlock);
+        } else if (util <= kink2) {
+            return kink1.mul(multiplierPerBlock).div(1e18).add(baseRatePerBlock);
         } else {
-            uint256 normalRate = kink.mul(multiplierPerBlock).div(1e18).add(baseRatePerBlock);
-            uint256 excessUtil = util.sub(kink);
+            uint256 normalRate = kink1.mul(multiplierPerBlock).div(1e18).add(baseRatePerBlock);
+            uint256 excessUtil = util.sub(kink2);
             return excessUtil.mul(jumpMultiplierPerBlock).div(1e18).add(normalRate);
         }
     }
@@ -174,24 +185,28 @@ contract JumpRateModelV2 is InterestRateModel {
      * @param baseRatePerYear The approximate target base APR, as a mantissa (scaled by 1e18)
      * @param multiplierPerYear The rate of increase in interest rate wrt utilization (scaled by 1e18)
      * @param jumpMultiplierPerYear The multiplierPerBlock after hitting a specified utilization point
-     * @param kink_ The utilization point at which the jump multiplier is applied
+     * @param kink1_ The utilization point at which the interest rate is fixed
+     * @param kink2_ The utilization point at which the jump multiplier is applied
      * @param roof_ The utilization point at which the borrow rate is fixed
      */
-    function updateJumpRateModelInternal(
+    function updateTripleRateModelInternal(
         uint256 baseRatePerYear,
         uint256 multiplierPerYear,
         uint256 jumpMultiplierPerYear,
-        uint256 kink_,
+        uint256 kink1_,
+        uint256 kink2_,
         uint256 roof_
     ) internal {
+        require(kink1_ <= kink2_, "kink1 must less than or equal to kink2");
         require(roof_ >= minRoofValue, "invalid roof value");
 
         baseRatePerBlock = baseRatePerYear.div(blocksPerYear);
-        multiplierPerBlock = (multiplierPerYear.mul(1e18)).div(blocksPerYear.mul(kink_));
+        multiplierPerBlock = (multiplierPerYear.mul(1e18)).div(blocksPerYear.mul(kink1_));
         jumpMultiplierPerBlock = jumpMultiplierPerYear.div(blocksPerYear);
-        kink = kink_;
+        kink1 = kink1_;
+        kink2 = kink2_;
         roof = roof_;
 
-        emit NewInterestParams(baseRatePerBlock, multiplierPerBlock, jumpMultiplierPerBlock, kink, roof);
+        emit NewInterestParams(baseRatePerBlock, multiplierPerBlock, jumpMultiplierPerBlock, kink1, kink2, roof);
     }
 }

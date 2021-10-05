@@ -1,4 +1,6 @@
+require("dotenv").config();
 require("@nomiclabs/hardhat-waffle");
+require("@nomiclabs/hardhat-etherscan");
 
 // You need to export an object to set up your config
 // Go to https://hardhat.org/config/ to learn more
@@ -19,13 +21,27 @@ module.exports = {
   networks: {
     hardhat: {
       forking: {
-        url: "https://data-seed-prebsc-2-s2.binance.org:8545/"
+        url: "https://arb1.arbitrum.io/rpc"
       }
     },
-    bsc_testnet: {
-      url: "https://data-seed-prebsc-2-s2.binance.org:8545/",
-      allowUnlimitedContractSize: true,
-      accounts: ["0x<YOUR_PRIVATE_KEY>"]
+    arbitrum: {
+      url: "https://arb1.arbitrum.io/rpc",
+      accounts: [`0x${process.env.DEPLOY_PRIVATE_KEY}`]
+    },
+    fuji: {
+      url: 'https://api.avax-test.network/ext/bc/C/rpc',
+      gasPrice: 225000000000,
+      chainId: 43113,
+      accounts: [`0x${process.env.DEPLOY_PRIVATE_KEY}`]
+    },
+    avalanche: {
+      url: 'https://api.avax.network/ext/bc/C/rpc',
+      gasPrice: 225000000000,
+      chainId: 43114,
+      accounts: [`0x${process.env.DEPLOY_PRIVATE_KEY}`]
     }
+  },
+  etherscan: {
+    apiKey: process.env.ETHERSCAN_API_KEY
   }
 };
