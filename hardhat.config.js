@@ -27,6 +27,18 @@ module.exports = {
     arbitrum: {
       url: "https://arb1.arbitrum.io/rpc",
       accounts: [`0x${process.env.DEPLOY_PRIVATE_KEY}`]
+    },
+    fuji: {
+      url: 'https://api.avax-test.network/ext/bc/C/rpc',
+      gasPrice: 225000000000,
+      chainId: 43113,
+      accounts: [`0x${process.env.DEPLOY_PRIVATE_KEY}`]
+    },
+    avalanche: {
+      url: 'https://api.avax.network/ext/bc/C/rpc',
+      gasPrice: 225000000000,
+      chainId: 43114,
+      accounts: [`0x${process.env.DEPLOY_PRIVATE_KEY}`]
     }
   },
   etherscan: {
