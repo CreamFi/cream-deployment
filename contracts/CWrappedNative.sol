@@ -162,6 +162,27 @@ contract CWrappedNative is CToken, CWrappedNativeInterface {
     }
 
     /**
+     * @notice Sender repays a borrow belonging to borrower
+     * @param borrower the account with the debt being payed off
+     * @param repayAmount The amount to repay
+     * @return uint 0=success, otherwise a failure (see ErrorReporter.sol for details)
+     */
+    function repayBorrowBehalf(address borrower, uint256 repayAmount) external returns (uint256) {
+        (uint256 err, ) = repayBorrowBehalfInternal(borrower, repayAmount, false);
+        require(err == 0, "repay behalf failed");
+    }
+
+    /**
+     * @notice Sender repays a borrow belonging to borrower
+     * @param borrower the account with the debt being payed off
+     * @return uint 0=success, otherwise a failure (see ErrorReporter.sol for details)
+     */
+    function repayBorrowBehalfNative(address borrower) external payable returns (uint256) {
+        (uint256 err, ) = repayBorrowBehalfInternal(borrower, msg.value, true);
+        require(err == 0, "repay behalf native failed");
+    }
+
+    /**
      * @notice The sender liquidates the borrowers collateral.
      *  The collateral seized is transferred to the liquidator.
      * @dev Accrues interest whether or not the operation succeeds, unless reverted
@@ -463,6 +484,8 @@ contract CWrappedNative is CToken, CWrappedNativeInterface {
         /* We emit a Transfer event */
         emit Transfer(src, dst, tokens);
 
+        comptroller.transferVerify(address(this), src, dst, tokens);
+
         return uint256(Error.NO_ERROR);
     }
 
@@ -547,6 +570,9 @@ contract CWrappedNative is CToken, CWrappedNativeInterface {
         /* We emit a Mint event, and a Transfer event */
         emit Mint(minter, vars.actualMintAmount, vars.mintTokens);
         emit Transfer(address(this), minter, vars.mintTokens);
+
+        /* We call the defense hook */
+        comptroller.mintVerify(address(this), minter, vars.actualMintAmount, vars.mintTokens);
 
         return (uint256(Error.NO_ERROR), vars.actualMintAmount);
     }
@@ -636,6 +662,10 @@ contract CWrappedNative is CToken, CWrappedNativeInterface {
         // EFFECTS & INTERACTIONS
         // (No safe failures beyond this point)
 
+        /* We write previously calculated values into storage */
+        totalSupply = vars.totalSupplyNew;
+        accountTokens[redeemer] = vars.accountTokensNew;
+
         /*
          * We invoke doTransferOut for the redeemer and the redeemAmount.
          *  Note: The cToken must handle variations between ERC-20 and ETH underlying.
@@ -643,10 +673,6 @@ contract CWrappedNative is CToken, CWrappedNativeInterface {
          *  doTransferOut reverts if anything goes wrong, since we can't be sure if side effects occurred.
          */
         doTransferOut(redeemer, vars.redeemAmount, isNative);
-
-        /* We write previously calculated values into storage */
-        totalSupply = vars.totalSupplyNew;
-        accountTokens[redeemer] = vars.accountTokensNew;
 
         /* We emit a Transfer event, and a Redeem event */
         emit Transfer(redeemer, address(this), vars.redeemTokens);
@@ -703,6 +729,9 @@ contract CWrappedNative is CToken, CWrappedNativeInterface {
 
         /* Emit a Transfer event */
         emit Transfer(borrower, liquidator, seizeTokens);
+
+        /* We call the defense hook */
+        comptroller.seizeVerify(address(this), seizerToken, liquidator, borrower, seizeTokens);
 
         return uint256(Error.NO_ERROR);
     }

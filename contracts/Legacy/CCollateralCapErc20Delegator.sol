@@ -1,6 +1,6 @@
 pragma solidity ^0.5.16;
 
-import "./CTokenInterfaces.sol";
+import "../CTokenInterfaces.sol";
 
 /**
  * @title Cream's CCollateralCapErc20Delegator Contract
@@ -132,6 +132,18 @@ contract CCollateralCapErc20Delegator is CTokenInterface, CCollateralCapErc20Int
      * @return uint 0=success, otherwise a failure (see ErrorReporter.sol for details)
      */
     function repayBorrow(uint256 repayAmount) external returns (uint256) {
+        repayAmount; // Shh
+        delegateAndReturn();
+    }
+
+    /**
+     * @notice Sender repays a borrow belonging to borrower
+     * @param borrower the account with the debt being payed off
+     * @param repayAmount The amount to repay
+     * @return uint 0=success, otherwise a failure (see ErrorReporter.sol for details)
+     */
+    function repayBorrowBehalf(address borrower, uint256 repayAmount) external returns (uint256) {
+        borrower;
         repayAmount; // Shh
         delegateAndReturn();
     }

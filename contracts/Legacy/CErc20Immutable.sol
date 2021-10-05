@@ -1,6 +1,6 @@
 pragma solidity ^0.5.16;
 
-import "./CErc20.sol";
+import "../CErc20.sol";
 
 /**
  * @title Compound's CErc20Immutable Contract

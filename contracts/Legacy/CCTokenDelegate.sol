@@ -1,7 +1,7 @@
 pragma solidity ^0.5.16;
 
 import "./CCapableErc20Delegate.sol";
-import "./EIP20Interface.sol";
+import "../EIP20Interface.sol";
 
 /**
  * @notice Compound's Comptroller interface to get Comp address

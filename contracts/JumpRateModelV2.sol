@@ -27,7 +27,7 @@ contract JumpRateModelV2 is InterestRateModel {
     /**
      * @notice The approximate number of blocks per year that is assumed by the interest rate model
      */
-    uint256 public constant blocksPerYear = 2102400;
+    uint256 public constant blocksPerYear = 31536000;
 
     /**
      * @notice The minimum roof value used for calculating borrow rate.

@@ -343,6 +343,8 @@ contract CErc20Interface is CErc20Storage {
 
     function repayBorrow(uint256 repayAmount) external returns (uint256);
 
+    function repayBorrowBehalf(address borrower, uint256 repayAmount) external returns (uint256);
+
     function liquidateBorrow(
         address borrower,
         uint256 repayAmount,
@@ -376,6 +378,8 @@ contract CWrappedNativeInterface is CErc20Interface {
     function borrowNative(uint256 borrowAmount) external returns (uint256);
 
     function repayBorrowNative() external payable returns (uint256);
+
+    function repayBorrowBehalfNative(address borrower) external payable returns (uint256);
 
     function liquidateBorrowNative(address borrower, CTokenInterface cTokenCollateral)
         external
