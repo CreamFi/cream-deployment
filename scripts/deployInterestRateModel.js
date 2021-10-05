@@ -8,10 +8,10 @@ async function main() {
   const TripleSlopeRateModel = await hre.ethers.getContractFactory("TripleSlopeRateModel");
 
   const baseRate = 0;
-  const multiplier = parseEther('0.2');
-  const jump = parseEther('5');
-  const kink1 = parseEther('0.7');
-  const kink2 = parseEther('0.8');
+  const multiplier = parseEther('0.23');
+  const jump = parseEther('8');
+  const kink1 = parseEther('0.8');
+  const kink2 = parseEther('0.9');
   const roof = parseEther('1.5');
   const interestRateModel = await TripleSlopeRateModel.deploy(
     0,

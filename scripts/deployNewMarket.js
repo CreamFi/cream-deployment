@@ -2,52 +2,53 @@ const hre = require("hardhat");
 
 const parseEther = hre.ethers.utils.parseEther;
 
-const adminAddress = "0x5b4058A9000e86fe136Ac896352C4DFD539E32a1";
-const comptrollerAddress = "0xbadaC56c9aca307079e8B8FC699987AAc89813ee";
-const cTokenImplementationAddress = "0x20d5d319C2964ecb52e1B006a4C059b7f6d6ad0a";
-const cWrappedNativeDelegateAddress = "0x468a7BF78f11Da82c90b17a93adb7B14999aF5AB";
+const adminAddress = "0x0a4AcCD9D150AD4DDC7eA2e6151243CE668Bf2f5";
+const comptrollerAddress = "0x66e9c76b76F73B7F04108E26d201bC4023386Fa6";
+const cTokenImplementationAddress = "0x79EA17bEE0a8dcb900737E8CAa247c8358A5dfa1";
+const cWrappedNativeDelegateAddress = "0x98d6AFDA3A488bB8B080c66009326466e986D583";
 
-const wETHAddress = "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1";
+const wETHAddress = "0xd00ae08403B9bbb9124bB305C09058E32C39A48c";
 
 
-const majorIRMAddress = "0x3FaE5e5722C51cdb5B0afD8c7082e8a6AF336Ee8";
-const stableIRMAddress = "0x7ef18d0a9C3Fb1A716FF6c3ED0Edf52a2427F716";
+const majorIRMAddress = "0x0980f2F0D2af35eF2c4521b2342D59db575303F7";
+const stableIRMAddress = "0x379555965fcdbA7A40e8B5b5eF4786f51ADeeF31";
 
-const underlyingAddress = "0xFd086bC7CD5C481DCC9C85ebE478A1C0b69FCbb9";
-const initialExchangeRate = "200000000000000";
-const crName = "Cream Tether USD";
-const crSymbol = "crUSDT";
+const underlyingAddress = "0x1741B9C475e0861a43B03F984928082Ac4f3fB95";
+const exchangeRate1e6 = "200000000000000";
+const exchangeRate1e18 = "200000000000000000000000000";
+const crName = "Cream Chainlink";
+const crSymbol = "crLINK";
 
 async function main() {
-  // const CrETH = await hre.ethers.getContractFactory("CWrappedNativeDelegator");
-  // const crETH = await CrETH.deploy(
-  //   wETHAddress,
-  //   comptrollerAddress,
-  //   majorIRMAddress,
-  //   "200000000000000000000000000",
-  //   "Cream Ether",
-  //   "crETH",
-  //   8,
-  //   adminAddress,
-  //   cWrappedNativeDelegateAddress,
-  //   "0x"
-  // );
-  // console.log("crETH deployed:", crETH.address);
-
-  const CrToken = await hre.ethers.getContractFactory("CCollateralCapErc20Delegator");
-  const crToken = await CrToken.deploy(
-    underlyingAddress,
+  const CrETH = await hre.ethers.getContractFactory("CWrappedNativeDelegator");
+  const crETH = await CrETH.deploy(
+    wETHAddress,
     comptrollerAddress,
-    stableIRMAddress,
-    initialExchangeRate,
-    crName,
-    crSymbol,
+    majorIRMAddress,
+    exchangeRate1e18,
+    "Cream Avalanche",
+    "crAVAX",
     8,
     adminAddress,
-    cTokenImplementationAddress,
+    cWrappedNativeDelegateAddress,
     "0x"
   );
-  console.log(crSymbol, "deployed:", crToken.address);
+  console.log("crETH deployed:", crETH.address);
+
+  // const CrToken = await hre.ethers.getContractFactory("CCollateralCapErc20Delegator");
+  // const crToken = await CrToken.deploy(
+  //   underlyingAddress,
+  //   comptrollerAddress,
+  //   majorIRMAddress,
+  //   exchangeRate1e18,
+  //   crName,
+  //   crSymbol,
+  //   8,
+  //   adminAddress,
+  //   cTokenImplementationAddress,
+  //   "0x"
+  // );
+  // console.log(crSymbol, "deployed:", crToken.address);
 }
 
 main()
