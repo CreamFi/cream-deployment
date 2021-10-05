@@ -10,8 +10,10 @@ Installation
 
 Setup
 ------------
-Replace `<YOUR_PRIVATE_KEY>` in `hardhat.config.js` with your private key
+
+    cp .env.default .env
+Fill in environment variables
 
 Deploy
 ------
-    npx hardhat run scripts/deploy.js --network bsc_testnet
+    npx hardhat run scripts/deployComptroller.js --network <NETWORK>
