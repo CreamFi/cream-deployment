@@ -48,6 +48,8 @@ async function main() {
 
   for (let i=0; i < cTokenAddresses.length; i++) {
     await cTokenAdmin._setReserveFactor(cTokenAddresses[i], rfs[i]);
+    await comptroller._supportMarket(cTokenAddresses[i], 1); // beware of Wrapped native market
+    await comptroller._setCollateralFactor(cTokenAddresses[i], cfs[i]);
   }
 
   await flashloanLender.updateUnderlyingMapping(cTokenAddresses);

@@ -3,8 +3,8 @@ const hre = require("hardhat");
 const parseEther = hre.ethers.utils.parseEther;
 
 async function main() {
-  const adminAddress = "0x197939c1ca20C2b506d6811d8B6CDB3394471074";
   const deployerAddress = (await hre.ethers.getSigners())[0].address;
+  const adminAddress = deployerAddress;
   const posterAddress = "0xd830A7413CB25FEe57f8115CD64E565B0Be466c3";
   const nativeUsdAggregatorAddress = "";
 
