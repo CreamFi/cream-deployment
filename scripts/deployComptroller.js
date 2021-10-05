@@ -6,8 +6,7 @@ async function main() {
   const adminAddress = "0x197939c1ca20C2b506d6811d8B6CDB3394471074";
   const deployerAddress = (await hre.ethers.getSigners())[0].address;
   const posterAddress = "0xd830A7413CB25FEe57f8115CD64E565B0Be466c3";
-  const ethUsdAggregatorAddress = "0x639Fe6ab55C921f74e7fac1ee960C0B6293ba612";
-  const flagsAddress = "0x3C14e07Edd0dC67442FA96f1Ec6999c57E810a83";
+  const nativeUsdAggregatorAddress = "";
 
   const Unitroller = await hre.ethers.getContractFactory("Unitroller");
   const Comptroller = await hre.ethers.getContractFactory("Comptroller");
@@ -33,8 +32,7 @@ async function main() {
   const priceOracleProxy = await PriceOracleProxy.deploy(
     deployerAddress,
     priceOracleV1.address,
-    ethUsdAggregatorAddress,
-    flagsAddress
+    nativeUsdAggregatorAddress,
   );
   console.log("PriceOracleProxy:", priceOracleProxy.address);
 
@@ -44,9 +42,6 @@ async function main() {
   const lens = await Lens.deploy();
   console.log('Lens:', lens.address);
 
-  const flashloanLender = await FlashloanLender.deploy(comptrollerAddress, deployerAddress);
-  console.log('FlashloanLender:', flashloanLender.address);
-
   let tx = await unitroller._setPendingImplementation(comptrollerImpl.address);
   await tx.wait();
   tx = await comptrollerImpl._become(unitroller.address);
@@ -55,7 +50,10 @@ async function main() {
   await comptroller._setCloseFactor(parseEther("0.5"));
   await comptroller._setLiquidationIncentive(parseEther("1.08"));
   await priceOracleProxy.deployed();
-  await comptroller._setPriceOracle(priceOracle.address);
+  await comptroller._setPriceOracle(priceOracleProxy.address);
+
+  const flashloanLender = await FlashloanLender.deploy(unitroller.address, deployerAddress);
+  console.log('FlashloanLender:', flashloanLender.address);
 
   console.log('deployment success.');
 }
