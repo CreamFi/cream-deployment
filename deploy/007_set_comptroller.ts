@@ -6,7 +6,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const {deployments, getNamedAccounts} = hre;
   const {deploy, execute, get, getArtifact, save} = deployments;
 
-  const {deployer} = await getNamedAccounts();
+  const {deployer, guardian} = await getNamedAccounts();
 
   const closeFactor = parseEther('0.5');
   const liquidationIncentive = parseEther('1.08');
@@ -16,6 +16,8 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   await execute('Comptroller', { from: deployer }, '_setCloseFactor', closeFactor);
   await execute('Comptroller', { from: deployer }, '_setLiquidationIncentive', liquidationIncentive);
   await execute('Comptroller', { from: deployer }, '_setPriceOracle', priceOracleAddress);
+  // await execute('Comptroller', { from: deployer }, '_setPauseGuardian', guardian);
+  // await execute('Comptroller', { from: deployer }, '_setBorrowCapGuardian', guardian);
 };
 export default func;
 func.tags = ['SetupComptroller'];
