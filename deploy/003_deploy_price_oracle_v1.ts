@@ -13,7 +13,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
     log: true,
   });
 
-  await execute('PriceOracleV1', {from: deployer}, '_setPendingAnchorAdmin', [admin]);
+  await execute('PriceOracleV1', {from: deployer}, '_setPendingAnchorAdmin', admin);
 };
 export default func;
 func.tags = ['PriceOracleV1'];
