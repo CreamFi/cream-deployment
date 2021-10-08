@@ -129,7 +129,7 @@ contract Unitroller is UnitrollerAdminStorage, ComptrollerErrorReporter {
      * @notice This view function is for aligning with EIP-1967 interface
      * @return The comptroller implementation
      */
-    function implementation() public returns (address) {
+    function implementation() public view returns (address) {
         return comptrollerImplementation;
     }
 
