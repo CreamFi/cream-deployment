@@ -2,19 +2,9 @@ import 'dotenv/config';
 import {HardhatUserConfig} from 'hardhat/types';
 import 'hardhat-deploy';
 import '@nomiclabs/hardhat-ethers';
+import '@nomiclabs/hardhat-etherscan';
+import './tasks';
 
-
-// require('hardhat-deploy');
-// require('@nomiclabs/hardhat-ethers')
-// require('@nomiclabs/hardhat-waffle');
-// require('@nomiclabs/hardhat-etherscan');
-
-// You need to export an object to set up your config
-// Go to https://hardhat.org/config/ to learn more
-
-/**
- * @type import('hardhat/config').HardhatUserConfig
- */
  const config: HardhatUserConfig = {
   defaultNetwork: 'hardhat',
   solidity: {
