@@ -8,9 +8,9 @@ enum IRM {
   Gov = 'GovIRM'
 }
 
-const crSymbol = 'crTESTLINK';
-const crName = 'Cream Chainlink';
-const underlyingAddress = '0x1741B9C475e0861a43B03F984928082Ac4f3fB95';
+const crSymbol = 'crLINK.e';
+const crName = 'Cream Chainlink Token';
+const underlyingAddress = '0x5947BB275c521040051D82396192181b413227A3';
 const interestRateModel = IRM.Gov;
 
 
@@ -25,9 +25,6 @@ async function main() {
   const underlying = await ethers.getContractAt(erc20ABI, underlyingAddress);
   const underlyingDecimal = await underlying.decimals();
   const initialExchangeRate = parseUnits('0.02', 18 + underlyingDecimal - 8);
-
-  // @ts-ignore
-  // await run("compile:one", { contractName: 'CErc20Delegator' });
 
   const result = await deploy(crSymbol, {
     from: deployer,
