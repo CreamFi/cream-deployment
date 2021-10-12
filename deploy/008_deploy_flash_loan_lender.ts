@@ -5,13 +5,13 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const {deployments, getNamedAccounts} = hre;
   const {deploy, get} = deployments;
 
-  const {deployer, guardian} = await getNamedAccounts();
+  const {deployer} = await getNamedAccounts();
 
   const unitrollerAddress = (await get('Unitroller')).address
 
   await deploy('FlashloanLender', {
     from: deployer,
-    args: [unitrollerAddress, guardian],
+    args: [unitrollerAddress, deployer],
     log: true,
   });
 };
