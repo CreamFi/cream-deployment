@@ -9,14 +9,17 @@ async function main() {
   const crWAVAXAddress = (await get('crWAVAX')).address;
   const crUSDTAddress = (await get('crUSDT.E')).address;
   const crUSDCAddress = (await get('crUSDC.E')).address;
+  const crDAIAddress = (await get('crDAI.E')).address;
+  const crWBTCAddress = (await get('crWBTC.E')).address;
+  const crWETHAddress = (await get('crWETH.E')).address;
 
   const comptrollerContract = new ethers.Contract(comptroller.address, comptroller.abi, ethers.provider)
 
-  let tx = await comptrollerContract.populateTransaction._setCreditLimit(BORROWER, crWAVAXAddress, parseEther('2'));
-  console.log(tx)
-  tx = await comptrollerContract.populateTransaction._setCreditLimit(BORROWER, crUSDTAddress, parseUnits('100', 6));
+  let tx = await comptrollerContract.populateTransaction._setCreditLimit(BORROWER, crDAIAddress, parseEther('100'));
   console.log(tx)
   tx = await comptrollerContract.populateTransaction._setCreditLimit(BORROWER, crUSDCAddress, parseUnits('100', 6));
+  console.log(tx)
+  tx = await comptrollerContract.populateTransaction._setCreditLimit(BORROWER, crWETHAddress, parseEther('0.03'));
   console.log(tx)
 }
 
