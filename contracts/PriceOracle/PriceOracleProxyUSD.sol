@@ -2,6 +2,7 @@ pragma solidity ^0.5.16;
 
 import "./PriceOracle.sol";
 import "./interfaces/AggregatorV3Interface.sol";
+import "./interfaces/FlagsInterface.sol";
 import "./interfaces/V1PriceOracleInterface.sol";
 import "../CErc20.sol";
 import "../CToken.sol";
@@ -9,6 +10,10 @@ import "../Exponential.sol";
 import "../EIP20Interface.sol";
 
 contract PriceOracleProxyUSD is PriceOracle, Exponential {
+    /// @notice Identifier of the Sequencer offline flag on the Flags contract
+    address private constant FLAG_ARBITRUM_SEQ_OFFLINE =
+        address(bytes20(bytes32(uint256(keccak256("chainlink.flags.arbitrum-seq-offline")) - 1)));
+
     /// @notice ChainLink aggregator base, currently support USD and ETH
     enum AggregatorBase {
         USD,
@@ -43,6 +48,9 @@ contract PriceOracleProxyUSD is PriceOracle, Exponential {
     /// @notice The ETH-USD aggregator address
     AggregatorV3Interface public ethUsdAggregator;
 
+    /// @notice The Chainlink L2 Sequencer Health Flag address
+    FlagsInterface private chainlinkFlags;
+
     /**
      * @param admin_ The address of admin to set aggregators
      * @param v1PriceOracle_ The v1 price oracle
@@ -50,11 +58,13 @@ contract PriceOracleProxyUSD is PriceOracle, Exponential {
     constructor(
         address admin_,
         address v1PriceOracle_,
-        address ethUsdAggregator_
+        address ethUsdAggregator_,
+        address flags_
     ) public {
         admin = admin_;
         v1PriceOracle = V1PriceOracleInterface(v1PriceOracle_);
         ethUsdAggregator = AggregatorV3Interface(ethUsdAggregator_);
+        chainlinkFlags = FlagsInterface(flags_);
     }
 
     /**
@@ -67,6 +77,12 @@ contract PriceOracleProxyUSD is PriceOracle, Exponential {
 
         AggregatorInfo memory aggregatorInfo = aggregators[cTokenAddress];
         if (address(aggregatorInfo.source) != address(0)) {
+            bool isRaised = chainlinkFlags.getFlag(FLAG_ARBITRUM_SEQ_OFFLINE);
+            if (isRaised) {
+                // If flag is raised we shouldn't perform any critical operations
+                revert("Chainlink feeds are not being updated");
+            }
+
             uint256 price = getPriceFromChainlink(aggregatorInfo.source);
             if (aggregatorInfo.base == AggregatorBase.ETH) {
                 // Convert the price to USD based if it's ETH based.

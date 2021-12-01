@@ -158,7 +158,7 @@ contract CTokenNoInterest is CTokenInterface, Exponential, TokenErrorReporter {
      *  This exists mainly for inheriting test contracts to stub this result.
      */
     function getBlockNumber() internal view returns (uint256) {
-        return block.timestamp;
+        return block.number;
     }
 
     /**
