@@ -13,14 +13,21 @@ async function main() {
   const crWBTCAddress = (await get('crWBTC.E')).address;
   const crWETHAddress = (await get('crWETH.E')).address;
 
-  const comptrollerContract = new ethers.Contract(comptroller.address, comptroller.abi, ethers.provider)
+  const comptrollerContract = new ethers.Contract(comptroller.address, comptroller.abi, ethers.provider);
 
-  let tx = await comptrollerContract.populateTransaction._setCreditLimit(BORROWER, crDAIAddress, parseEther('100'));
-  console.log(tx)
-  tx = await comptrollerContract.populateTransaction._setCreditLimit(BORROWER, crUSDCAddress, parseUnits('100', 6));
-  console.log(tx)
-  tx = await comptrollerContract.populateTransaction._setCreditLimit(BORROWER, crWETHAddress, parseEther('0.03'));
-  console.log(tx)
+  let tx;
+  // tx = await comptrollerContract.populateTransaction._setCreditLimit(BORROWER, crUSDCAddress, parseUnits('33500000', 6));
+  // console.log('USDC:', tx)
+  // tx = await comptrollerContract.populateTransaction._setCreditLimit(BORROWER, crUSDTAddress, parseUnits('24000000', 6));
+  // console.log('USDT:', tx)
+  tx = await comptrollerContract.populateTransaction._setCreditLimit(BORROWER, crWAVAXAddress, parseEther('415000'));
+  console.log('AVAX:', tx)
+  // tx = await comptrollerContract.populateTransaction._setCreditLimit(BORROWER, crDAIAddress, parseEther('4000000'));
+  // console.log('DAI:', tx)
+  // tx = await comptrollerContract.populateTransaction._setCreditLimit(BORROWER, crWETHAddress, parseEther('1450'));
+  // console.log('ETH:', tx)
+  // tx = await comptrollerContract.populateTransaction._setCreditLimit(BORROWER, crWBTCAddress, parseUnits('32', 8));
+  // console.log('BTC:', tx)
 }
 
 main()
