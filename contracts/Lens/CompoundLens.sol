@@ -186,4 +186,24 @@ contract CompoundLens is Exponential {
         }
         return rewards;
     }
+
+    function getClaimableCompRewards(
+        CCTokenInterface[] calldata cTokens,
+        address comp,
+        address account
+    ) external returns (uint256[] memory) {
+        uint256 cTokenCount = cTokens.length;
+        uint256[] memory rewards = new uint256[](cTokenCount);
+        for (uint256 i = 0; i < cTokenCount; i++) {
+            uint256 balanceBefore = EIP20Interface(comp).balanceOf(account);
+            cTokens[i].claimComp(account);
+            uint256 balanceAfter = EIP20Interface(comp).balanceOf(account);
+            rewards[i] = sub_(balanceAfter, balanceBefore);
+        }
+        return rewards;
+    }
+
+    function compareStrings(string memory a, string memory b) internal pure returns (bool) {
+        return (keccak256(abi.encodePacked((a))) == keccak256(abi.encodePacked((b))));
+    }
 }

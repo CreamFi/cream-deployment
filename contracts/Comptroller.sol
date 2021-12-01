@@ -1349,6 +1349,6 @@ contract Comptroller is ComptrollerV1Storage, ComptrollerInterface, ComptrollerE
     }
 
     function getBlockNumber() public view returns (uint256) {
-        return block.timestamp;
+        return block.number;
     }
 }
