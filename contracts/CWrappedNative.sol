@@ -259,7 +259,7 @@ contract CWrappedNative is CToken, CWrappedNativeInterface {
         bytes calldata data
     ) external nonReentrant returns (bool) {
         require(amount > 0, "flashLoan amount should be greater than zero");
-        require(accrueInterest() == uint256(Error.NO_ERROR), "accrue interest failed");
+        accrueInterest();
         require(
             ComptrollerInterfaceExtension(address(comptroller)).flashloanAllowed(
                 address(this),

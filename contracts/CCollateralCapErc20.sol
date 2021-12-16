@@ -189,7 +189,7 @@ contract CCollateralCapErc20 is CToken, CCollateralCapErc20Interface {
         bytes calldata data
     ) external nonReentrant returns (bool) {
         require(amount > 0, "flashLoan amount should be greater than zero");
-        require(accrueInterest() == uint256(Error.NO_ERROR), "accrue interest failed");
+        accrueInterest();
         require(
             ComptrollerInterfaceExtension(address(comptroller)).flashloanAllowed(
                 address(this),
@@ -248,7 +248,7 @@ contract CCollateralCapErc20 is CToken, CCollateralCapErc20Interface {
         // Make sure accountCollateralTokens of `account` is initialized.
         initializeAccountCollateralTokens(account);
 
-        require(msg.sender == address(comptroller), "only comptroller may register collateral for user");
+        require(msg.sender == address(comptroller), "comptroller only");
 
         uint256 amount = sub_(accountTokens[account], accountCollateralTokens[account]);
         return increaseUserCollateralInternal(account, amount);
@@ -263,7 +263,7 @@ contract CCollateralCapErc20 is CToken, CCollateralCapErc20Interface {
         // Make sure accountCollateralTokens of `account` is initialized.
         initializeAccountCollateralTokens(account);
 
-        require(msg.sender == address(comptroller), "only comptroller may unregister collateral for user");
+        require(msg.sender == address(comptroller), "comptroller only");
         require(
             comptroller.redeemAllowed(address(this), account, accountCollateralTokens[account]) == 0,
             "comptroller rejection"

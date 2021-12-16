@@ -19,6 +19,7 @@
     "ethers": "^5.5.1",
     "fs-extra": "^10.0.0",
     "hardhat": "^2.2.1",
+    "hardhat-contract-sizer": "^2.1.1",
     "hardhat-deploy": "^0.9.3",
     "mocha": "^8.3.2",
     "ts-node": "^9.1.1",

@@ -26,7 +26,7 @@ contract CCollateralCapErc20Delegate is CCollateralCapErc20 {
             implementation = address(0);
         }
 
-        require(msg.sender == admin, "only the admin may call _becomeImplementation");
+        require(msg.sender == admin, "admin only");
 
         // Set internal cash when becoming implementation
         internalCash = getCashOnChain();
@@ -47,6 +47,6 @@ contract CCollateralCapErc20Delegate is CCollateralCapErc20 {
             implementation = address(0);
         }
 
-        require(msg.sender == admin, "only the admin may call _resignImplementation");
+        require(msg.sender == admin, "admin only");
     }
 }
