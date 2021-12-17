@@ -13,7 +13,7 @@ import "./InterestRateModel.sol";
  * @notice Abstract base for CTokens
  * @author Compound
  */
-contract CToken is CTokenInterface, Exponential, TokenErrorReporter {
+contract CTokenCheckRepay is CTokenInterface, Exponential, TokenErrorReporter {
     /**
      * @notice Initialize the money market
      * @param comptroller_ The address of the Comptroller
@@ -156,7 +156,7 @@ contract CToken is CTokenInterface, Exponential, TokenErrorReporter {
      *  This exists mainly for inheriting test contracts to stub this result.
      */
     function getBlockNumber() internal view returns (uint256) {
-        return block.timestamp;
+        return block.number;
     }
 
     /**
@@ -502,7 +502,7 @@ contract CToken is CTokenInterface, Exponential, TokenErrorReporter {
     function repayBorrowInternal(uint256 repayAmount, bool isNative) internal nonReentrant returns (uint256, uint256) {
         accrueInterest();
         // repayBorrowFresh emits repay-borrow-specific logs on errors, so we don't need to
-        return repayBorrowFresh(msg.sender, msg.sender, repayAmount, isNative);
+        return repayBorrowFresh(msg.sender, msg.sender, repayAmount, isNative, false);
     }
 
     /**
@@ -519,7 +519,7 @@ contract CToken is CTokenInterface, Exponential, TokenErrorReporter {
     ) internal nonReentrant returns (uint256, uint256) {
         accrueInterest();
         // repayBorrowFresh emits repay-borrow-specific logs on errors, so we don't need to
-        return repayBorrowFresh(msg.sender, borrower, repayAmount, isNative);
+        return repayBorrowFresh(msg.sender, borrower, repayAmount, isNative, false);
     }
 
     struct RepayBorrowLocalVars {
@@ -539,13 +539,15 @@ contract CToken is CTokenInterface, Exponential, TokenErrorReporter {
      * @param borrower the account with the debt being payed off
      * @param repayAmount the amount of undelrying tokens being returned
      * @param isNative The amount is in native or not
+     * @param isFromLiquidation The request is from liquidation or not
      * @return (uint, uint) An error code (0=success, otherwise a failure, see ErrorReporter.sol), and the actual repayment amount.
      */
     function repayBorrowFresh(
         address payer,
         address borrower,
         uint256 repayAmount,
-        bool isNative
+        bool isNative,
+        bool isFromLiquidation
     ) internal returns (uint256, uint256) {
         /* Fail if repayBorrow not allowed */
         require(
@@ -583,6 +585,17 @@ contract CToken is CTokenInterface, Exponential, TokenErrorReporter {
          *   it returns the amount actually transferred, in case of a fee.
          */
         vars.actualRepayAmount = doTransferIn(payer, vars.repayAmount, isNative);
+
+        // Only check account liquidity if the request is from liquidation to save gas.
+        if (isFromLiquidation) {
+            // Right after `doTransferIn` and before updating the storage, check the borrower's account liquidity again.
+            // If a reentrant call to another asset is made during transferring AMP in, a second account liquidity check
+            // could help prevent excessive liquidation.
+            (uint256 err, , uint256 shortfall) = ComptrollerInterfaceExtension(address(comptroller))
+                .getAccountLiquidity(borrower);
+            require(err == 0, "failed to get account liquidity");
+            require(shortfall > 0, "borrower has no shortfall");
+        }
 
         /*
          * We calculate the new borrower and total borrow balances, failing on underflow:
@@ -679,7 +692,13 @@ contract CToken is CTokenInterface, Exponential, TokenErrorReporter {
         LiquidateBorrowLocalVars memory vars;
 
         /* Fail if repayBorrow fails */
-        (vars.repayBorrowError, vars.actualRepayAmount) = repayBorrowFresh(liquidator, borrower, repayAmount, isNative);
+        (vars.repayBorrowError, vars.actualRepayAmount) = repayBorrowFresh(
+            liquidator,
+            borrower,
+            repayAmount,
+            isNative,
+            true
+        );
         require(vars.repayBorrowError == uint256(Error.NO_ERROR), "repay borrow failed");
 
         /////////////////////////
@@ -981,8 +1000,8 @@ contract CToken is CTokenInterface, Exponential, TokenErrorReporter {
         totalReserves = totalReservesNew;
 
         // doTransferOut reverts if anything goes wrong, since we can't be sure if side effects occurred.
-        // Restrict reducing reserves in wrapped token. Implementations except `CWrappedNative` won't use parameter `isNative`.
-        doTransferOut(admin, reduceAmount, false);
+        // Restrict reducing reserves in native token. Implementations except `CWrappedNative` won't use parameter `isNative`.
+        doTransferOut(admin, reduceAmount, true);
 
         emit ReservesReduced(admin, reduceAmount, totalReservesNew);
 

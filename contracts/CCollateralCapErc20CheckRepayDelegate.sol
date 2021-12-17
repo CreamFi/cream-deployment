@@ -1,13 +1,13 @@
 pragma solidity ^0.5.16;
 
-import "./CWrappedNative.sol";
+import "./CCollateralCapErc20CheckRepay.sol";
 
 /**
- * @title Cream's CWrappedNativeDelegate Contract
+ * @title Cream's CCollateralCapErc20CheckRepayDelegate Contract
  * @notice CTokens which wrap an EIP-20 underlying and are delegated to
  * @author Cream
  */
-contract CWrappedNativeDelegate is CWrappedNative {
+contract CCollateralCapErc20CheckRepayDelegate is CCollateralCapErc20CheckRepay {
     /**
      * @notice Construct an empty delegate
      */
@@ -28,15 +28,14 @@ contract CWrappedNativeDelegate is CWrappedNative {
 
         require(msg.sender == admin, "admin only");
 
-        // Set CToken version in comptroller and convert native token to wrapped token.
+        // Set internal cash when becoming implementation
+        internalCash = getCashOnChain();
+
+        // Set CToken version in comptroller
         ComptrollerInterfaceExtension(address(comptroller)).updateCTokenVersion(
             address(this),
-            ComptrollerV1Storage.Version.WRAPPEDNATIVE
+            ComptrollerV1Storage.Version.COLLATERALCAP
         );
-        uint256 balance = address(this).balance;
-        if (balance > 0) {
-            WrappedNativeInterface(underlying).deposit.value(balance)();
-        }
     }
 
     /**

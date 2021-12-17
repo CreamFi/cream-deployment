@@ -126,10 +126,7 @@ contract Comptroller is ComptrollerV1Storage, ComptrollerInterface, ComptrollerE
     function addToMarketInternal(CToken cToken, address borrower) internal returns (Error) {
         Market storage marketToJoin = markets[address(cToken)];
 
-        if (!marketToJoin.isListed) {
-            // market is not listed, cannot join
-            return Error.MARKET_NOT_LISTED;
-        }
+        require(marketToJoin.isListed, "market not listed");
 
         if (marketToJoin.version == Version.COLLATERALCAP) {
             // register collateral for the borrower if the token is CollateralCap version.
@@ -168,15 +165,10 @@ contract Comptroller is ComptrollerV1Storage, ComptrollerInterface, ComptrollerE
         require(oErr == 0, "exitMarket: getAccountSnapshot failed"); // semi-opaque error code
 
         /* Fail if the sender has a borrow balance */
-        if (amountOwed != 0) {
-            return fail(Error.NONZERO_BORROW_BALANCE, FailureInfo.EXIT_MARKET_BALANCE_OWED);
-        }
+        require(amountOwed == 0, "nonzero borrow balance");
 
         /* Fail if the sender is not permitted to redeem all of their tokens */
-        uint256 allowed = redeemAllowedInternal(cTokenAddress, msg.sender, tokensHeld);
-        if (allowed != 0) {
-            return failOpaque(Error.REJECTION, FailureInfo.EXIT_MARKET_REJECTION, allowed);
-        }
+        require(redeemAllowedInternal(cTokenAddress, msg.sender, tokensHeld) == 0, "failed to exit market");
 
         Market storage marketToExit = markets[cTokenAddress];
 
@@ -246,9 +238,7 @@ contract Comptroller is ComptrollerV1Storage, ComptrollerInterface, ComptrollerE
         require(!mintGuardianPaused[cToken], "mint is paused");
         require(!isCreditAccount(minter, cToken), "credit account cannot mint");
 
-        if (!isMarketListed(cToken)) {
-            return uint256(Error.MARKET_NOT_LISTED);
-        }
+        require(isMarketListed(cToken), "market not listed");
 
         uint256 supplyCap = supplyCaps[cToken];
         // Supply cap of 0 corresponds to unlimited supplying
@@ -312,9 +302,7 @@ contract Comptroller is ComptrollerV1Storage, ComptrollerInterface, ComptrollerE
         address redeemer,
         uint256 redeemTokens
     ) internal view returns (uint256) {
-        if (!isMarketListed(cToken)) {
-            return uint256(Error.MARKET_NOT_LISTED);
-        }
+        require(isMarketListed(cToken), "market not listed");
 
         /* If the redeemer is not 'in' the market, then we can bypass the liquidity check */
         if (!markets[cToken].accountMembership[redeemer]) {
@@ -328,12 +316,8 @@ contract Comptroller is ComptrollerV1Storage, ComptrollerInterface, ComptrollerE
             redeemTokens,
             0
         );
-        if (err != Error.NO_ERROR) {
-            return uint256(err);
-        }
-        if (shortfall > 0) {
-            return uint256(Error.INSUFFICIENT_LIQUIDITY);
-        }
+        require(err == Error.NO_ERROR, "failed to get account liquidity");
+        require(shortfall == 0, "insufficient liquidity");
 
         return uint256(Error.NO_ERROR);
     }
@@ -376,27 +360,20 @@ contract Comptroller is ComptrollerV1Storage, ComptrollerInterface, ComptrollerE
         // Pausing is a very serious situation - we revert to sound the alarms
         require(!borrowGuardianPaused[cToken], "borrow is paused");
 
-        if (!isMarketListed(cToken)) {
-            return uint256(Error.MARKET_NOT_LISTED);
-        }
+        require(isMarketListed(cToken), "market not listed");
 
         if (!markets[cToken].accountMembership[borrower]) {
             // only cTokens may call borrowAllowed if borrower not in market
             require(msg.sender == cToken, "sender must be cToken");
 
             // attempt to add borrower to the market
-            Error err = addToMarketInternal(CToken(cToken), borrower);
-            if (err != Error.NO_ERROR) {
-                return uint256(err);
-            }
+            require(addToMarketInternal(CToken(cToken), borrower) == Error.NO_ERROR, "failed to add market");
 
             // it should be impossible to break the important invariant
             assert(markets[cToken].accountMembership[borrower]);
         }
 
-        if (oracle.getUnderlyingPrice(CToken(cToken)) == 0) {
-            return uint256(Error.PRICE_ERROR);
-        }
+        require(oracle.getUnderlyingPrice(CToken(cToken)) != 0, "price error");
 
         uint256 borrowCap = borrowCaps[cToken];
         // Borrow cap of 0 corresponds to unlimited borrowing
@@ -412,12 +389,8 @@ contract Comptroller is ComptrollerV1Storage, ComptrollerInterface, ComptrollerE
             0,
             borrowAmount
         );
-        if (err != Error.NO_ERROR) {
-            return uint256(err);
-        }
-        if (shortfall > 0) {
-            return uint256(Error.INSUFFICIENT_LIQUIDITY);
-        }
+        require(err == Error.NO_ERROR, "failed to get account liquidity");
+        require(shortfall == 0, "insufficient liquidity");
 
         return uint256(Error.NO_ERROR);
     }
@@ -461,9 +434,7 @@ contract Comptroller is ComptrollerV1Storage, ComptrollerInterface, ComptrollerE
         // Shh - currently unused
         repayAmount;
 
-        if (!isMarketListed(cToken)) {
-            return uint256(Error.MARKET_NOT_LISTED);
-        }
+        require(isMarketListed(cToken), "market not listed");
 
         if (isCreditAccount(borrower, cToken)) {
             require(borrower == payer, "cannot repay on behalf of credit account");
@@ -519,18 +490,12 @@ contract Comptroller is ComptrollerV1Storage, ComptrollerInterface, ComptrollerE
         // Shh - currently unused
         liquidator;
 
-        if (!isMarketListed(cTokenBorrowed) || !isMarketListed(cTokenCollateral)) {
-            return uint256(Error.MARKET_NOT_LISTED);
-        }
+        require(isMarketListed(cTokenBorrowed) && isMarketListed(cTokenCollateral), "market not listed");
 
         /* The borrower must have shortfall in order to be liquidatable */
         (Error err, , uint256 shortfall) = getAccountLiquidityInternal(borrower);
-        if (err != Error.NO_ERROR) {
-            return uint256(err);
-        }
-        if (shortfall == 0) {
-            return uint256(Error.INSUFFICIENT_SHORTFALL);
-        }
+        require(err == Error.NO_ERROR, "failed to get account liquidity");
+        require(shortfall > 0, "insufficient shortfall");
 
         /* The liquidator may not repay more than what is allowed by the closeFactor */
         uint256 borrowBalance = CToken(cTokenBorrowed).borrowBalanceStored(borrower);
@@ -595,13 +560,11 @@ contract Comptroller is ComptrollerV1Storage, ComptrollerInterface, ComptrollerE
         liquidator;
         seizeTokens;
 
-        if (!isMarketListed(cTokenCollateral) || !isMarketListed(cTokenBorrowed)) {
-            return uint256(Error.MARKET_NOT_LISTED);
-        }
-
-        if (CToken(cTokenCollateral).comptroller() != CToken(cTokenBorrowed).comptroller()) {
-            return uint256(Error.COMPTROLLER_MISMATCH);
-        }
+        require(isMarketListed(cTokenBorrowed) && isMarketListed(cTokenCollateral), "market not listed");
+        require(
+            CToken(cTokenCollateral).comptroller() == CToken(cTokenBorrowed).comptroller(),
+            "comptroller mismatched"
+        );
 
         return uint256(Error.NO_ERROR);
     }
@@ -708,7 +671,7 @@ contract Comptroller is ComptrollerV1Storage, ComptrollerInterface, ComptrollerE
      * @param newVersion The new version
      */
     function updateCTokenVersion(address cToken, Version newVersion) external {
-        require(msg.sender == cToken, "only cToken could update its version");
+        require(msg.sender == cToken, "cToken only");
 
         // This function will be called when a new CToken implementation becomes active.
         // If a new CToken is newly created, this market is not listed yet. The version of
@@ -865,10 +828,7 @@ contract Comptroller is ComptrollerV1Storage, ComptrollerInterface, ComptrollerE
             (oErr, vars.cTokenBalance, vars.borrowBalance, vars.exchangeRateMantissa) = asset.getAccountSnapshot(
                 account
             );
-            if (oErr != 0) {
-                // semi-opaque error code, we assume NO_ERROR == 0 is invariant between upgrades
-                return (Error.SNAPSHOT_ERROR, 0, 0);
-            }
+            require(oErr == 0, "snapshot error");
 
             // Once a market's credit limit is set, the account's collateral won't be considered anymore.
             uint256 creditLimit = creditLimits[account][address(asset)];
@@ -892,9 +852,7 @@ contract Comptroller is ComptrollerV1Storage, ComptrollerInterface, ComptrollerE
 
                 // Get the normalized price of the asset
                 vars.oraclePriceMantissa = oracle.getUnderlyingPrice(asset);
-                if (vars.oraclePriceMantissa == 0) {
-                    return (Error.PRICE_ERROR, 0, 0);
-                }
+                require(vars.oraclePriceMantissa > 0, "price error");
                 vars.oraclePrice = Exp({mantissa: vars.oraclePriceMantissa});
 
                 // Pre-compute a conversion factor from tokens -> ether (normalized price value)
@@ -959,9 +917,7 @@ contract Comptroller is ComptrollerV1Storage, ComptrollerInterface, ComptrollerE
         /* Read oracle prices for borrowed and collateral markets */
         uint256 priceBorrowedMantissa = oracle.getUnderlyingPrice(CToken(cTokenBorrowed));
         uint256 priceCollateralMantissa = oracle.getUnderlyingPrice(CToken(cTokenCollateral));
-        if (priceBorrowedMantissa == 0 || priceCollateralMantissa == 0) {
-            return (uint256(Error.PRICE_ERROR), 0);
-        }
+        require(priceBorrowedMantissa > 0 && priceCollateralMantissa > 0, "price error");
 
         /*
          * Get the exchange rate and calculate the number of collateral tokens to seize:
@@ -1099,7 +1055,7 @@ contract Comptroller is ComptrollerV1Storage, ComptrollerInterface, ComptrollerE
      * @return uint 0=success, otherwise a failure. (See enum Error for details)
      */
     function _supportMarket(CToken cToken, Version version) external returns (uint256) {
-        require(msg.sender == admin, "only admin may support market");
+        require(msg.sender == admin, "admin only");
         require(!isMarketListed(address(cToken)), "market already listed");
 
         cToken.isCToken(); // Sanity check to make sure its really a CToken
@@ -1118,7 +1074,7 @@ contract Comptroller is ComptrollerV1Storage, ComptrollerInterface, ComptrollerE
      * @param cToken The address of the market (token) to delist
      */
     function _delistMarket(CToken cToken) external {
-        require(msg.sender == admin, "only admin may delist market");
+        require(msg.sender == admin, "admin only");
         require(isMarketListed(address(cToken)), "market not listed");
         require(cToken.totalSupply() == 0, "market not empty");
 
@@ -1150,7 +1106,7 @@ contract Comptroller is ComptrollerV1Storage, ComptrollerInterface, ComptrollerE
      * @param newSupplyCapGuardian The address of the new Supply Cap Guardian
      */
     function _setSupplyCapGuardian(address newSupplyCapGuardian) external {
-        require(msg.sender == admin, "only admin can set supply cap guardian");
+        require(msg.sender == admin, "admin only");
 
         // Save current value for inclusion in log
         address oldSupplyCapGuardian = supplyCapGuardian;
@@ -1170,10 +1126,7 @@ contract Comptroller is ComptrollerV1Storage, ComptrollerInterface, ComptrollerE
      * @param newSupplyCaps The new supply cap values in underlying to be set. A value of 0 corresponds to unlimited supplying.
      */
     function _setMarketSupplyCaps(CToken[] calldata cTokens, uint256[] calldata newSupplyCaps) external {
-        require(
-            msg.sender == admin || msg.sender == supplyCapGuardian,
-            "only admin or supply cap guardian can set supply caps"
-        );
+        require(msg.sender == admin || msg.sender == supplyCapGuardian, "admin or supply cap guardian only");
 
         uint256 numMarkets = cTokens.length;
         uint256 numSupplyCaps = newSupplyCaps.length;
@@ -1194,10 +1147,7 @@ contract Comptroller is ComptrollerV1Storage, ComptrollerInterface, ComptrollerE
      * @param newBorrowCaps The new borrow cap values in underlying to be set. A value of 0 corresponds to unlimited borrowing.
      */
     function _setMarketBorrowCaps(CToken[] calldata cTokens, uint256[] calldata newBorrowCaps) external {
-        require(
-            msg.sender == admin || msg.sender == borrowCapGuardian,
-            "only admin or borrow cap guardian can set borrow caps"
-        );
+        require(msg.sender == admin || msg.sender == borrowCapGuardian, "admin or borrow cap guardian only");
 
         uint256 numMarkets = cTokens.length;
         uint256 numBorrowCaps = newBorrowCaps.length;
@@ -1215,7 +1165,7 @@ contract Comptroller is ComptrollerV1Storage, ComptrollerInterface, ComptrollerE
      * @param newBorrowCapGuardian The address of the new Borrow Cap Guardian
      */
     function _setBorrowCapGuardian(address newBorrowCapGuardian) external {
-        require(msg.sender == admin, "only admin can set borrow cap guardian");
+        require(msg.sender == admin, "admin only");
 
         // Save current value for inclusion in log
         address oldBorrowCapGuardian = borrowCapGuardian;
@@ -1255,7 +1205,7 @@ contract Comptroller is ComptrollerV1Storage, ComptrollerInterface, ComptrollerE
      * @param newLiquidityMining The address of the new liquidity mining module
      */
     function _setLiquidityMining(address newLiquidityMining) external {
-        require(msg.sender == admin, "only admin can set liquidity mining module");
+        require(msg.sender == admin, "admin only");
         require(LiquidityMiningInterface(newLiquidityMining).comptroller() == address(this), "mismatch comptroller");
 
         // Save current value for inclusion in log
@@ -1269,9 +1219,9 @@ contract Comptroller is ComptrollerV1Storage, ComptrollerInterface, ComptrollerE
     }
 
     function _setMintPaused(CToken cToken, bool state) public returns (bool) {
-        require(isMarketListed(address(cToken)), "cannot pause a market that is not listed");
-        require(msg.sender == pauseGuardian || msg.sender == admin, "only pause guardian and admin can pause");
-        require(msg.sender == admin || state == true, "only admin can unpause");
+        require(isMarketListed(address(cToken)), "market not listed");
+        require(msg.sender == pauseGuardian || msg.sender == admin, "guardian or admin only");
+        require(msg.sender == admin || state == true, "admin only");
 
         mintGuardianPaused[address(cToken)] = state;
         emit ActionPaused(cToken, "Mint", state);
@@ -1279,9 +1229,9 @@ contract Comptroller is ComptrollerV1Storage, ComptrollerInterface, ComptrollerE
     }
 
     function _setBorrowPaused(CToken cToken, bool state) public returns (bool) {
-        require(isMarketListed(address(cToken)), "cannot pause a market that is not listed");
-        require(msg.sender == pauseGuardian || msg.sender == admin, "only pause guardian and admin can pause");
-        require(msg.sender == admin || state == true, "only admin can unpause");
+        require(isMarketListed(address(cToken)), "market not listed");
+        require(msg.sender == pauseGuardian || msg.sender == admin, "guardian or admin only");
+        require(msg.sender == admin || state == true, "admin only");
 
         borrowGuardianPaused[address(cToken)] = state;
         emit ActionPaused(cToken, "Borrow", state);
@@ -1289,9 +1239,9 @@ contract Comptroller is ComptrollerV1Storage, ComptrollerInterface, ComptrollerE
     }
 
     function _setFlashloanPaused(CToken cToken, bool state) public returns (bool) {
-        require(isMarketListed(address(cToken)), "cannot pause a market that is not listed");
-        require(msg.sender == pauseGuardian || msg.sender == admin, "only pause guardian and admin can pause");
-        require(msg.sender == admin || state == true, "only admin can unpause");
+        require(isMarketListed(address(cToken)), "market not listed");
+        require(msg.sender == pauseGuardian || msg.sender == admin, "guardian or admin only");
+        require(msg.sender == admin || state == true, "admin only");
 
         flashloanGuardianPaused[address(cToken)] = state;
         emit ActionPaused(cToken, "Flashloan", state);
@@ -1299,8 +1249,8 @@ contract Comptroller is ComptrollerV1Storage, ComptrollerInterface, ComptrollerE
     }
 
     function _setTransferPaused(bool state) public returns (bool) {
-        require(msg.sender == pauseGuardian || msg.sender == admin, "only pause guardian and admin can pause");
-        require(msg.sender == admin || state == true, "only admin can unpause");
+        require(msg.sender == pauseGuardian || msg.sender == admin, "guardian or admin only");
+        require(msg.sender == admin || state == true, "admin only");
 
         transferGuardianPaused = state;
         emit ActionPaused("Transfer", state);
@@ -1308,8 +1258,8 @@ contract Comptroller is ComptrollerV1Storage, ComptrollerInterface, ComptrollerE
     }
 
     function _setSeizePaused(bool state) public returns (bool) {
-        require(msg.sender == pauseGuardian || msg.sender == admin, "only pause guardian and admin can pause");
-        require(msg.sender == admin || state == true, "only admin can unpause");
+        require(msg.sender == pauseGuardian || msg.sender == admin, "guardian or admin only");
+        require(msg.sender == admin || state == true, "admin only");
 
         seizeGuardianPaused = state;
         emit ActionPaused("Seize", state);
@@ -1317,8 +1267,8 @@ contract Comptroller is ComptrollerV1Storage, ComptrollerInterface, ComptrollerE
     }
 
     function _become(Unitroller unitroller) public {
-        require(msg.sender == unitroller.admin(), "only unitroller admin can change brains");
-        require(unitroller._acceptImplementation() == 0, "change not authorized");
+        require(msg.sender == unitroller.admin(), "unitroller admin only");
+        require(unitroller._acceptImplementation() == 0, "unauthorized");
     }
 
     /**

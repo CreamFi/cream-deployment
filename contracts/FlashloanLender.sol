@@ -60,6 +60,11 @@ contract FlashloanLender is ERC3156FlashLenderInterface {
         return CCollateralCapErc20(cToken).flashLoan(receiver, msg.sender, amount, data);
     }
 
+    function transferOwnership(address newOwner) external onlyOwner {
+        require(newOwner != address(0), "new owner cannot be zero address");
+        owner = newOwner;
+    }
+
     function updateUnderlyingMapping(CToken[] calldata cTokens) external onlyOwner returns (bool) {
         uint256 cTokenLength = cTokens.length;
         for (uint256 i = 0; i < cTokenLength; i++) {
