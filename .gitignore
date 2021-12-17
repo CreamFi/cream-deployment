@@ -5,3 +5,5 @@ cache/
 artifacts/
 
 .env
+
+deployments/*/solcInputs/

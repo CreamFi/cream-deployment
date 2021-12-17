@@ -4,9 +4,14 @@ import {parseEther} from 'ethers/lib/utils';
 
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const {deployments, getNamedAccounts} = hre;
-  const {deploy, execute, get, getArtifact, save} = deployments;
+  const {execute, get} = deployments;
 
   const {deployer, guardian} = await getNamedAccounts();
+
+  const unitrollerAddress = (await get('Unitroller')).address;
+  const comptrollerImplAddress = (await get('Comptroller_Implementation')).address;
+  await execute('Unitroller', { from: deployer }, '_setPendingImplementation', comptrollerImplAddress);
+  await execute('Comptroller_Implementation', { from: deployer }, '_become', unitrollerAddress);
 
   const closeFactor = parseEther('0.5');
   const liquidationIncentive = parseEther('1.08');

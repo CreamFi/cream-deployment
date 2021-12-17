@@ -6,7 +6,7 @@ import '@nomiclabs/hardhat-etherscan';
 import 'hardhat-contract-sizer';
 import './tasks';
 
- const config: HardhatUserConfig = {
+const config: HardhatUserConfig = {
   defaultNetwork: 'hardhat',
   solidity: {
     version: '0.5.17',
@@ -45,20 +45,36 @@ import './tasks';
         url: 'https://api.avax.network/ext/bc/C/rpc'
       }
     },
+    mainnet: {
+      url: `https://cloudflare-eth.com`,
+      accounts:
+      process.env.DEPLOY_PRIVATE_KEY == undefined ? [] : [`0x${process.env.DEPLOY_PRIVATE_KEY}`]
+    },
     arbitrum: {
       url: 'https://arb1.arbitrum.io/rpc',
-      accounts: [`0x${process.env.DEPLOY_PRIVATE_KEY}`]
-    },
-    fuji: {
-      url: 'https://api.avax-test.network/ext/bc/C/rpc',
-      gasPrice: 225000000000,
-      chainId: 43113,
-      accounts: [`0x${process.env.DEPLOY_PRIVATE_KEY}`]
+      accounts:
+      process.env.DEPLOY_PRIVATE_KEY == undefined ? [] : [`0x${process.env.DEPLOY_PRIVATE_KEY}`]
     },
     avalanche: {
       url: 'https://api.avax.network/ext/bc/C/rpc',
       chainId: 43114,
-      accounts: [`0x${process.env.DEPLOY_PRIVATE_KEY}`]
+      accounts:
+      process.env.DEPLOY_PRIVATE_KEY == undefined ? [] : [`0x${process.env.DEPLOY_PRIVATE_KEY}`]
+    },
+    polygon: {
+      url: 'https://polygon-rpc.com',
+      accounts:
+      process.env.DEPLOY_PRIVATE_KEY == undefined ? [] : [`0x${process.env.DEPLOY_PRIVATE_KEY}`]
+    },
+    bsc: {
+      url: 'https://bsc-dataseed.binance.org/',
+      accounts:
+      process.env.DEPLOY_PRIVATE_KEY == undefined ? [] : [`0x${process.env.DEPLOY_PRIVATE_KEY}`]
+    },
+    ftm: {
+      url: 'https://rpc.ftm.tools/',
+      accounts:
+      process.env.DEPLOY_PRIVATE_KEY == undefined ? [] : [`0x${process.env.DEPLOY_PRIVATE_KEY}`]
     }
   },
   etherscan: {

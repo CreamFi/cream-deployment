@@ -3,7 +3,7 @@ import {DeployFunction} from 'hardhat-deploy/types';
 
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const {deployments, getNamedAccounts} = hre;
-  const {deploy, execute, get, save} = deployments;
+  const {deploy, get, save} = deployments;
 
   const {deployer} = await getNamedAccounts();
 
@@ -14,10 +14,6 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   });
 
   const unitrollerAddress = (await get('Unitroller')).address;
-
-  await execute('Unitroller', { from: deployer }, '_setPendingImplementation', comptrollerImpl.address);
-  await execute('Comptroller_Implementation', { from: deployer }, '_become', unitrollerAddress);
-
   // update Comptroller ABI
   await save('Comptroller', {
     abi: comptrollerImpl.abi,
@@ -26,4 +22,4 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 };
 export default func;
 func.tags = ['Comptroller'];
-func.dependencies = ['Unitroller'];
+// func.dependencies = ['Unitroller'];
