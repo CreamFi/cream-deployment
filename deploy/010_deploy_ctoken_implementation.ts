@@ -7,12 +7,17 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   const {deployer} = await getNamedAccounts();
 
-  await deploy('CWrappedNativeDelegate', {
+//   await deploy('CWrappedNativeDelegate', {
+//     from: deployer,
+//     log: true
+//   });
+
+  await deploy('CCollateralCapErc20Delegate', {
     from: deployer,
     log: true
   });
 
-  await deploy('CCollateralCapErc20Delegate', {
+  await deploy('CCollateralCapErc20NoInterestDelegate', {
     from: deployer,
     log: true
   });
@@ -20,4 +25,3 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 };
 export default func;
 func.tags = ['CTokenImplementation'];
-func.runAtTheEnd = true;
