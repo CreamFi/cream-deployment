@@ -238,7 +238,7 @@ contract CCapableErc20 is CToken, CCapableErc20Interface {
                 revert(0, 0)
             }
         }
-        require(success, "TOKEN_TRANSFER_IN_FAILED");
+        require(success, "transfer failed");
 
         // Calculate the amount that was *actually* transferred
         uint256 balanceAfter = EIP20Interface(underlying).balanceOf(address(this));
@@ -283,7 +283,7 @@ contract CCapableErc20 is CToken, CCapableErc20Interface {
                 revert(0, 0)
             }
         }
-        require(success, "TOKEN_TRANSFER_OUT_FAILED");
+        require(success, "transfer failed");
         internalCash = sub_(internalCash, amount);
     }
 

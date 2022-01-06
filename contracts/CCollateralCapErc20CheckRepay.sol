@@ -265,10 +265,7 @@ contract CCollateralCapErc20CheckRepay is CTokenCheckRepay, CCollateralCapErc20I
         initializeAccountCollateralTokens(account);
 
         require(msg.sender == address(comptroller), "comptroller only");
-        require(
-            comptroller.redeemAllowed(address(this), account, accountCollateralTokens[account]) == 0,
-            "comptroller rejection"
-        );
+        require(comptroller.redeemAllowed(address(this), account, accountCollateralTokens[account]) == 0, "rejected");
 
         decreaseUserCollateralInternal(account, accountCollateralTokens[account]);
     }
@@ -356,7 +353,7 @@ contract CCollateralCapErc20CheckRepay is CTokenCheckRepay, CCollateralCapErc20I
                 revert(0, 0)
             }
         }
-        require(success, "TOKEN_TRANSFER_IN_FAILED");
+        require(success, "transfer failed");
 
         // Calculate the amount that was *actually* transferred
         uint256 balanceAfter = EIP20Interface(underlying).balanceOf(address(this));
@@ -401,7 +398,7 @@ contract CCollateralCapErc20CheckRepay is CTokenCheckRepay, CCollateralCapErc20I
                 revert(0, 0)
             }
         }
-        require(success, "TOKEN_TRANSFER_OUT_FAILED");
+        require(success, "transfer failed");
         internalCash = sub_(internalCash, amount);
     }
 
@@ -440,7 +437,7 @@ contract CCollateralCapErc20CheckRepay is CTokenCheckRepay, CCollateralCapErc20I
          * Since bufferTokens are not collateralized and can be transferred freely, we only check with comptroller
          * whether collateralized tokens can be transferred.
          */
-        require(comptroller.transferAllowed(address(this), src, dst, collateralTokens) == 0, "comptroller rejection");
+        require(comptroller.transferAllowed(address(this), src, dst, collateralTokens) == 0, "rejected");
 
         /* Do not allow self-transfers */
         require(src != dst, "bad input");
@@ -565,7 +562,7 @@ contract CCollateralCapErc20CheckRepay is CTokenCheckRepay, CCollateralCapErc20I
         initializeAccountCollateralTokens(minter);
 
         /* Fail if mint not allowed */
-        require(comptroller.mintAllowed(address(this), minter, mintAmount) == 0, "comptroller rejection");
+        require(comptroller.mintAllowed(address(this), minter, mintAmount) == 0, "rejected");
 
         /*
          * Return if mintAmount is zero.
@@ -576,7 +573,7 @@ contract CCollateralCapErc20CheckRepay is CTokenCheckRepay, CCollateralCapErc20I
         }
 
         /* Verify market's block number equals current block number */
-        require(accrualBlockNumber == getBlockNumber(), "market not fresh");
+        require(accrualBlockNumber == getBlockNumber(), "market is stale");
 
         MintLocalVars memory vars;
 
@@ -690,10 +687,10 @@ contract CCollateralCapErc20CheckRepay is CTokenCheckRepay, CCollateralCapErc20I
         }
 
         /* redeemAllowed might check more than user's liquidity. */
-        require(comptroller.redeemAllowed(address(this), redeemer, collateralTokens) == 0, "comptroller rejection");
+        require(comptroller.redeemAllowed(address(this), redeemer, collateralTokens) == 0, "rejected");
 
         /* Verify market's block number equals current block number */
-        require(accrualBlockNumber == getBlockNumber(), "market not fresh");
+        require(accrualBlockNumber == getBlockNumber(), "market is stale");
 
         /* Reverts if protocol has insufficient cash */
         require(getCashPrior() >= vars.redeemAmount, "insufficient cash");
@@ -756,7 +753,7 @@ contract CCollateralCapErc20CheckRepay is CTokenCheckRepay, CCollateralCapErc20I
         /* Fail if seize not allowed */
         require(
             comptroller.seizeAllowed(address(this), seizerToken, liquidator, borrower, seizeTokens) == 0,
-            "comptroller rejection"
+            "rejected"
         );
 
         /*

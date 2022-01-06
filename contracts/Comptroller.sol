@@ -220,6 +220,27 @@ contract Comptroller is ComptrollerV1Storage, ComptrollerInterface, ComptrollerE
         return markets[cTokenAddress].isListed;
     }
 
+    /**
+     * @notice Return the credit limit of a specific protocol
+     * @dev This function shouldn't be called. It exists only for backward compatibility.
+     * @param protocol The address of the protocol
+     * @return The credit
+     */
+    function creditLimits(address protocol) public view returns (uint256) {
+        protocol; // Shh
+        return 0;
+    }
+
+    /**
+     * @notice Return the credit limit of a specific protocol for a specific market
+     * @param protocol The address of the protocol
+     * @param market The market
+     * @return The credit
+     */
+    function creditLimits(address protocol, address market) public view returns (uint256) {
+        return _creditLimits[protocol][market];
+    }
+
     /*** Policy Hooks ***/
 
     /**
@@ -691,7 +712,7 @@ contract Comptroller is ComptrollerV1Storage, ComptrollerInterface, ComptrollerE
      * @return The account is a credit account or not
      */
     function isCreditAccount(address account, address cToken) public view returns (bool) {
-        return creditLimits[account][cToken] > 0;
+        return _creditLimits[account][cToken] > 0;
     }
 
     /*** Liquidity/Liquidation Calculations ***/
@@ -831,7 +852,7 @@ contract Comptroller is ComptrollerV1Storage, ComptrollerInterface, ComptrollerE
             require(oErr == 0, "snapshot error");
 
             // Once a market's credit limit is set, the account's collateral won't be considered anymore.
-            uint256 creditLimit = creditLimits[account][address(asset)];
+            uint256 creditLimit = _creditLimits[account][address(asset)];
             if (creditLimit > 0) {
                 // The market's credit limit should be always greater than its borrow balance and the borrow balance won't be added to sumBorrowPlusEffects.
                 require(creditLimit >= vars.borrowBalance, "insufficient credit limit");
@@ -1285,7 +1306,7 @@ contract Comptroller is ComptrollerV1Storage, ComptrollerInterface, ComptrollerE
         require(msg.sender == admin, "only admin can set protocol credit limit");
         require(addToMarketInternal(CToken(market), protocol) == Error.NO_ERROR, "invalid market");
 
-        creditLimits[protocol][market] = creditLimit;
+        _creditLimits[protocol][market] = creditLimit;
         emit CreditLimitChanged(protocol, market, creditLimit);
     }
 

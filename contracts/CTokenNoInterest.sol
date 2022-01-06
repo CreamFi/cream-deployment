@@ -33,16 +33,16 @@ contract CTokenNoInterest is CTokenInterface, Exponential, TokenErrorReporter {
         string memory symbol_,
         uint8 decimals_
     ) public {
-        require(msg.sender == admin, "only admin may initialize the market");
-        require(accrualBlockNumber == 0 && borrowIndex == 0, "market may only be initialized once");
+        require(msg.sender == admin, "admin only");
+        require(accrualBlockNumber == 0 && borrowIndex == 0, "initialized");
 
         // Set initial exchange rate
         initialExchangeRateMantissa = initialExchangeRateMantissa_;
-        require(initialExchangeRateMantissa > 0, "initial exchange rate must be greater than zero.");
+        require(initialExchangeRateMantissa > 0, "invalid exchange rate");
 
         // Set the comptroller
         uint256 err = _setComptroller(comptroller_);
-        require(err == uint256(Error.NO_ERROR), "setting comptroller failed");
+        require(err == uint256(Error.NO_ERROR), "failed to set comptroller");
 
         // Initialize block number and borrow index (block number mocks depend on comptroller being set)
         accrualBlockNumber = getBlockNumber();
@@ -50,7 +50,7 @@ contract CTokenNoInterest is CTokenInterface, Exponential, TokenErrorReporter {
 
         // Set the interest rate model (depends on block number / borrow index)
         err = _setInterestRateModelFresh(interestRateModel_);
-        require(err == uint256(Error.NO_ERROR), "setting interest rate model failed");
+        require(err == uint256(Error.NO_ERROR), "failed to set IRM");
 
         name = name_;
         symbol = symbol_;
@@ -367,7 +367,7 @@ contract CTokenNoInterest is CTokenInterface, Exponential, TokenErrorReporter {
             borrowPriorForInterestCalculation,
             reservesPrior
         );
-        require(borrowRateMantissa <= borrowRateMaxMantissa, "borrow rate is absurdly high");
+        require(borrowRateMantissa <= borrowRateMaxMantissa, "borrow rate too high");
 
         /* Calculate the number of blocks elapsed since the last accrual */
         uint256 blockDelta = sub_(currentBlockNumber, accrualBlockNumberPrior);
@@ -477,10 +477,10 @@ contract CTokenNoInterest is CTokenInterface, Exponential, TokenErrorReporter {
         bool isNative
     ) internal returns (uint256) {
         /* Fail if borrow not allowed */
-        require(comptroller.borrowAllowed(address(this), borrower, borrowAmount) == 0, "comptroller rejection");
+        require(comptroller.borrowAllowed(address(this), borrower, borrowAmount) == 0, "rejected");
 
         /* Verify market's block number equals current block number */
-        require(accrualBlockNumber == getBlockNumber(), "market not fresh");
+        require(accrualBlockNumber == getBlockNumber(), "market is stale");
 
         /* Reverts if protocol has insufficient cash */
         require(getCashPrior() >= borrowAmount, "insufficient cash");
@@ -577,13 +577,10 @@ contract CTokenNoInterest is CTokenInterface, Exponential, TokenErrorReporter {
         bool isNative
     ) internal returns (uint256, uint256) {
         /* Fail if repayBorrow not allowed */
-        require(
-            comptroller.repayBorrowAllowed(address(this), payer, borrower, repayAmount) == 0,
-            "comptroller rejection"
-        );
+        require(comptroller.repayBorrowAllowed(address(this), payer, borrower, repayAmount) == 0, "rejected");
 
         /* Verify market's block number equals current block number */
-        require(accrualBlockNumber == getBlockNumber(), "market not fresh");
+        require(accrualBlockNumber == getBlockNumber(), "market is stale");
 
         RepayBorrowLocalVars memory vars;
 
@@ -690,14 +687,14 @@ contract CTokenNoInterest is CTokenInterface, Exponential, TokenErrorReporter {
                 borrower,
                 repayAmount
             ) == 0,
-            "comptroller rejection"
+            "rejected"
         );
 
         /* Verify market's block number equals current block number */
-        require(accrualBlockNumber == getBlockNumber(), "market not fresh");
+        require(accrualBlockNumber == getBlockNumber(), "market is stale");
 
         /* Verify cTokenCollateral market's block number equals current block number */
-        require(cTokenCollateral.accrualBlockNumber() == getBlockNumber(), "market not fresh");
+        require(cTokenCollateral.accrualBlockNumber() == getBlockNumber(), "market is stale");
 
         /* Fail if borrower = liquidator */
         require(borrower != liquidator, "invalid account pair");
@@ -721,10 +718,7 @@ contract CTokenNoInterest is CTokenInterface, Exponential, TokenErrorReporter {
             address(cTokenCollateral),
             vars.actualRepayAmount
         );
-        require(
-            vars.amountSeizeError == uint256(Error.NO_ERROR),
-            "LIQUIDATE_COMPTROLLER_CALCULATE_AMOUNT_SEIZE_FAILED"
-        );
+        require(vars.amountSeizeError == uint256(Error.NO_ERROR), "failed to calculate seize amount");
 
         /* Revert if borrower collateral token balance < seizeTokens */
         require(cTokenCollateral.balanceOf(borrower) >= vars.seizeTokens, "LIQUIDATE_SEIZE_TOO_MUCH");
@@ -839,7 +833,7 @@ contract CTokenNoInterest is CTokenInterface, Exponential, TokenErrorReporter {
 
         ComptrollerInterface oldComptroller = comptroller;
         // Ensure invoke comptroller.isComptroller() returns true
-        require(newComptroller.isComptroller(), "invalid Comptroller");
+        require(newComptroller.isComptroller(), "not comptroller");
 
         // Set market's comptroller to newComptroller
         comptroller = newComptroller;
