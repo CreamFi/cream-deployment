@@ -7,10 +7,10 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   const {deployer} = await getNamedAccounts();
 
-//   await deploy('CWrappedNativeDelegate', {
-//     from: deployer,
-//     log: true
-//   });
+  await deploy('CWrappedNativeDelegate', {
+    from: deployer,
+    log: true
+  });
 
   await deploy('CCollateralCapErc20Delegate', {
     from: deployer,
