@@ -66,7 +66,7 @@ const config: HardhatUserConfig = {
       url: 'https://bsc-dataseed.binance.org/',
       accounts: process.env.DEPLOY_PRIVATE_KEY == undefined ? [] : [`0x${process.env.DEPLOY_PRIVATE_KEY}`]
     },
-    ftm: {
+    fantom: {
       url: 'https://rpc.ftm.tools/',
       accounts: process.env.DEPLOY_PRIVATE_KEY == undefined ? [] : [`0x${process.env.DEPLOY_PRIVATE_KEY}`]
     }
