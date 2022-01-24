@@ -209,4 +209,10 @@ contract CTokenAdmin {
         }
         require(success, "TOKEN_TRANSFER_OUT_FAILED");
     }
+
+    function compareStrings(string memory a, string memory b) private pure returns (bool) {
+        return (keccak256(abi.encodePacked((a))) == keccak256(abi.encodePacked((b))));
+    }
+
+    function() external payable {}
 }

@@ -85,26 +85,63 @@ contract ComptrollerV1Storage is UnitrollerAdminStorage {
     bool public seizeGuardianPaused;
     mapping(address => bool) public mintGuardianPaused;
     mapping(address => bool) public borrowGuardianPaused;
-    mapping(address => bool) public flashloanGuardianPaused;
+
+    struct CompMarketState {
+        /// @notice The market's last updated compBorrowIndex or compSupplyIndex
+        uint224 index;
+        /// @notice The block number the index was last updated at
+        uint32 block;
+    }
 
     /// @notice A list of all markets
     CToken[] public allMarkets;
 
-    // @notice The borrowCapGuardian can set borrowCaps to any number for any market. Lowering the borrow cap could disable borrowing on the given market.
+    /// @notice The portion of compRate that each market currently receives
+    /// @dev This storage is depreacted.
+    mapping(address => uint256) public compSpeeds;
+
+    /// @notice The COMP market supply state for each market
+    /// @dev This storage is depreacted.
+    mapping(address => CompMarketState) public compSupplyState;
+
+    /// @notice The COMP market borrow state for each market
+    /// @dev This storage is depreacted.
+    mapping(address => CompMarketState) public compBorrowState;
+
+    /// @notice The COMP borrow index for each market for each supplier as of the last time they accrued COMP
+    /// @dev This storage is depreacted.
+    mapping(address => mapping(address => uint256)) public compSupplierIndex;
+
+    /// @notice The COMP borrow index for each market for each borrower as of the last time they accrued COMP
+    /// @dev This storage is depreacted.
+    mapping(address => mapping(address => uint256)) public compBorrowerIndex;
+
+    /// @notice The COMP accrued but not yet transferred to each user
+    /// @dev This storage is depreacted.
+    mapping(address => uint256) public compAccrued;
+
+    /// @notice The borrowCapGuardian can set borrowCaps to any number for any market. Lowering the borrow cap could disable borrowing on the given market.
     address public borrowCapGuardian;
 
-    // @notice Borrow caps enforced by borrowAllowed for each cToken address. Defaults to zero which corresponds to unlimited borrowing.
+    /// @notice Borrow caps enforced by borrowAllowed for each cToken address. Defaults to zero which corresponds to unlimited borrowing.
     mapping(address => uint256) public borrowCaps;
 
-    // @notice The supplyCapGuardian can set supplyCaps to any number for any market. Lowering the supply cap could disable supplying to the given market.
+    /// @notice The supplyCapGuardian can set supplyCaps to any number for any market. Lowering the supply cap could disable supplying to the given market.
     address public supplyCapGuardian;
 
-    // @notice Supply caps enforced by mintAllowed for each cToken address. Defaults to zero which corresponds to unlimited supplying.
+    /// @notice Supply caps enforced by mintAllowed for each cToken address. Defaults to zero which corresponds to unlimited supplying.
     mapping(address => uint256) public supplyCaps;
 
-    // @notice creditLimits allowed specific protocols to borrow and repay specific markets without collateral.
-    mapping(address => mapping(address => uint256)) public creditLimits;
+    /// @notice creditLimits allowed specific protocols to borrow and repay without collateral.
+    /// @dev This storage is depreacted.
+    mapping(address => uint256) public _creditLimits;
+
+    /// @notice flashloanGuardianPaused can pause flash loan as a safety mechanism.
+    mapping(address => bool) public flashloanGuardianPaused;
 
     /// @notice liquidityMining the liquidity mining module that handles the LM rewards distribution.
     address public liquidityMining;
+
+    /// @notice creditLimits allowed specific protocols to borrow and repay specific markets without collateral.
+    mapping(address => mapping(address => uint256)) public creditLimits;
 }

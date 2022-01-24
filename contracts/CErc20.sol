@@ -173,7 +173,7 @@ contract CErc20 is CToken, CErc20Interface {
                 revert(0, 0)
             }
         }
-        require(success, "TOKEN_TRANSFER_IN_FAILED");
+        require(success, "transfer failed");
 
         // Calculate the amount that was *actually* transferred
         uint256 balanceAfter = EIP20Interface(underlying).balanceOf(address(this));
@@ -216,7 +216,7 @@ contract CErc20 is CToken, CErc20Interface {
                 revert(0, 0)
             }
         }
-        require(success, "TOKEN_TRANSFER_OUT_FAILED");
+        require(success, "transfer failed");
     }
 
     /**
@@ -235,7 +235,7 @@ contract CErc20 is CToken, CErc20Interface {
         uint256 tokens
     ) internal returns (uint256) {
         /* Fail if transfer not allowed */
-        require(comptroller.transferAllowed(address(this), src, dst, tokens) == 0, "comptroller rejection");
+        require(comptroller.transferAllowed(address(this), src, dst, tokens) == 0, "rejected");
 
         /* Do not allow self-transfers */
         require(src != dst, "bad input");
@@ -293,7 +293,7 @@ contract CErc20 is CToken, CErc20Interface {
         bool isNative
     ) internal returns (uint256, uint256) {
         /* Fail if mint not allowed */
-        require(comptroller.mintAllowed(address(this), minter, mintAmount) == 0, "comptroller rejection");
+        require(comptroller.mintAllowed(address(this), minter, mintAmount) == 0, "rejected");
 
         /*
          * Return if mintAmount is zero.
@@ -304,7 +304,7 @@ contract CErc20 is CToken, CErc20Interface {
         }
 
         /* Verify market's block number equals current block number */
-        require(accrualBlockNumber == getBlockNumber(), "market not fresh");
+        require(accrualBlockNumber == getBlockNumber(), "market is stale");
 
         MintLocalVars memory vars;
 
@@ -398,7 +398,7 @@ contract CErc20 is CToken, CErc20Interface {
         }
 
         /* Fail if redeem not allowed */
-        require(comptroller.redeemAllowed(address(this), redeemer, vars.redeemTokens) == 0, "comptroller rejection");
+        require(comptroller.redeemAllowed(address(this), redeemer, vars.redeemTokens) == 0, "rejected");
 
         /*
          * Return if redeemTokensIn and redeemAmountIn are zero.
@@ -409,7 +409,7 @@ contract CErc20 is CToken, CErc20Interface {
         }
 
         /* Verify market's block number equals current block number */
-        require(accrualBlockNumber == getBlockNumber(), "market not fresh");
+        require(accrualBlockNumber == getBlockNumber(), "market is stale");
 
         /*
          * We calculate the new total supply and redeemer balance, checking for underflow:
@@ -467,7 +467,7 @@ contract CErc20 is CToken, CErc20Interface {
         /* Fail if seize not allowed */
         require(
             comptroller.seizeAllowed(address(this), seizerToken, liquidator, borrower, seizeTokens) == 0,
-            "comptroller rejection"
+            "rejected"
         );
 
         /*
