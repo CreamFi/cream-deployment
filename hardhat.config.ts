@@ -21,11 +21,13 @@ const config: HardhatUserConfig = {
     poster: '0xd830A7413CB25FEe57f8115CD64E565B0Be466c3',
     admin: {
       hardhat: '0x197939c1ca20C2b506d6811d8B6CDB3394471074',
-      avalanche: '0x197939c1ca20C2b506d6811d8B6CDB3394471074',
+      mainnet: '0xA5fC0BbfcD05827ed582869b7254b6f141BA84Eb',
+      avalanche: '0xf3472A93B94A17dC20F9Dc9D0D48De42FfbD14f4',
       fuji: '0x197939c1ca20C2b506d6811d8B6CDB3394471074'
     },
     guardian: {
       hardhat: '0x197939c1ca20C2b506d6811d8B6CDB3394471074',
+      mainnet: '0x9d960dAe0639C95a0C822C9d7769d19d30A430Aa',
       avalanche: '0x197939c1ca20C2b506d6811d8B6CDB3394471074',
       fuji: '0x197939c1ca20C2b506d6811d8B6CDB3394471074'
     },
@@ -46,7 +48,7 @@ const config: HardhatUserConfig = {
       }
     },
     mainnet: {
-      url: `https://cloudflare-eth.com`,
+      url: `https://mainnet.infura.io/v3/${process.env.INFURA_TOKEN}`,
       accounts: process.env.DEPLOY_PRIVATE_KEY == undefined ? [] : [`0x${process.env.DEPLOY_PRIVATE_KEY}`]
     },
     arbitrum: {
