@@ -8,10 +8,11 @@ enum IRM {
   Gov = 'GovIRM'
 }
 
-const crSymbol = 'crLINK.e';
-const crName = 'Cream Chainlink Token';
-const underlyingAddress = '0x5947BB275c521040051D82396192181b413227A3';
-const interestRateModel = IRM.Gov;
+const crSymbol = 'iUST';
+const crName = 'Iron Bank Axelar Wrapped UST';
+const underlyingAddress = '0x260Bbf5698121EB85e7a74f2E45E16Ce762EbE11';
+const interestRateModel = IRM.Stable;
+const exchangeRate = '0.02';
 
 
 async function main() {
@@ -24,7 +25,7 @@ async function main() {
   const erc20ABI = (await getArtifact('EIP20Interface')).abi;
   const underlying = await ethers.getContractAt(erc20ABI, underlyingAddress);
   const underlyingDecimal = await underlying.decimals();
-  const initialExchangeRate = parseUnits('0.02', 18 + underlyingDecimal - 8);
+  const initialExchangeRate = parseUnits(exchangeRate, 18 + underlyingDecimal - 8);
 
   const result = await deploy(crSymbol, {
     from: deployer,
