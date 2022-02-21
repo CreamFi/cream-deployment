@@ -22,13 +22,13 @@ const config: HardhatUserConfig = {
     admin: {
       hardhat: '0x197939c1ca20C2b506d6811d8B6CDB3394471074',
       mainnet: '0xA5fC0BbfcD05827ed582869b7254b6f141BA84Eb',
-      avalanche: '0xf3472A93B94A17dC20F9Dc9D0D48De42FfbD14f4',
+      avalanche: '0x3d4aBA3Af4EEe43d38D64EEf9Ea05340370e3cC9',
       fuji: '0x197939c1ca20C2b506d6811d8B6CDB3394471074'
     },
     guardian: {
       hardhat: '0x197939c1ca20C2b506d6811d8B6CDB3394471074',
       mainnet: '0x9d960dAe0639C95a0C822C9d7769d19d30A430Aa',
-      avalanche: '0x197939c1ca20C2b506d6811d8B6CDB3394471074',
+      avalanche: '0x93C220cf1Db6ea5Ab593180ccffA7C0C63A9767E',
       fuji: '0x197939c1ca20C2b506d6811d8B6CDB3394471074'
     },
     nativeUsdAggregator: {
