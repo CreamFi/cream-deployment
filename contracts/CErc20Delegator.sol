@@ -224,6 +224,14 @@ contract CErc20Delegator is CTokenInterface, CErc20Interface, CDelegatorInterfac
     }
 
     /**
+     * @notice Get the bep token owner
+     * @return The owner of token
+     */
+    function getOwner() external view returns (address) {
+        delegateToViewAndReturn();
+    }
+
+    /**
      * @notice Get the token balance of the `owner`
      * @param owner The address of the account to query
      * @return The number of tokens owned by `owner`

@@ -96,7 +96,7 @@ contract FlashloanLender is ERC3156FlashLenderInterface {
         uint256 cTokenLength = cTokens.length;
         for (uint256 i = 0; i < cTokenLength; i++) {
             CToken cToken = cTokens[i];
-            if (compareStrings(cToken.symbol(), "crETH")) {
+            if (compareStrings(cToken.symbol(), "crBNB")) {
                 continue;
             }
             address underlying = CErc20(address(cToken)).underlying();

@@ -2,7 +2,7 @@ pragma solidity ^0.5.16;
 pragma experimental ABIEncoderV2;
 
 import "./CCapableErc20Delegate.sol";
-import "../EIP20Interface.sol";
+import "../BEP20Interface.sol";
 
 // Ref: https://etherscan.io/address/0xc2edad668740f1aa35e4d8f227fb8e17dca888cd#code
 interface IMasterChef {
@@ -105,10 +105,10 @@ contract CSLPDelegate is CCapableErc20Delegate {
         pid = pid_;
 
         // Approve moving our SLP into the master chef contract.
-        EIP20Interface(underlying).approve(masterChefAddress_, uint256(-1));
+        BEP20Interface(underlying).approve(masterChefAddress_, uint256(-1));
 
         // Approve moving sushi rewards into the sushi bar contract.
-        EIP20Interface(sushi).approve(sushiBarAddress_, uint256(-1));
+        BEP20Interface(sushi).approve(sushiBarAddress_, uint256(-1));
     }
 
     /**
@@ -129,7 +129,7 @@ contract CSLPDelegate is CCapableErc20Delegate {
             slpSupplyState.balance = sub_(slpSupplyState.balance, xSushiBalance);
 
             uint256 balance = sushiBalance();
-            EIP20Interface(sushi).transfer(account, balance);
+            BEP20Interface(sushi).transfer(account, balance);
 
             // Clear user's xSushi accrued.
             xSushiUserAccrued[account] = 0;
@@ -190,7 +190,7 @@ contract CSLPDelegate is CCapableErc20Delegate {
         isNative; // unused
 
         // Perform the EIP-20 transfer in
-        EIP20Interface token = EIP20Interface(underlying);
+        BEP20Interface token = BEP20Interface(underlying);
         require(token.transferFrom(from, address(this), amount), "unexpected EIP-20 transfer in return");
 
         // Deposit to masterChef.
@@ -231,7 +231,7 @@ contract CSLPDelegate is CCapableErc20Delegate {
         updateSLPSupplyIndex();
         updateSupplierIndex(to);
 
-        EIP20Interface token = EIP20Interface(underlying);
+        BEP20Interface token = BEP20Interface(underlying);
         require(token.transfer(to, amount), "unexpected EIP-20 transfer out return");
     }
 
@@ -272,10 +272,10 @@ contract CSLPDelegate is CCapableErc20Delegate {
     }
 
     function sushiBalance() internal view returns (uint256) {
-        return EIP20Interface(sushi).balanceOf(address(this));
+        return BEP20Interface(sushi).balanceOf(address(this));
     }
 
     function xSushiBalance() internal view returns (uint256) {
-        return EIP20Interface(sushiBar).balanceOf(address(this));
+        return BEP20Interface(sushiBar).balanceOf(address(this));
     }
 }

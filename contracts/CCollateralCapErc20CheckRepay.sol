@@ -35,7 +35,7 @@ contract CCollateralCapErc20CheckRepay is CTokenCheckRepay, CCollateralCapErc20I
 
         // Set underlying and sanity check it
         underlying = underlying_;
-        EIP20Interface(underlying).totalSupply();
+        BEP20Interface(underlying).totalSupply();
     }
 
     /*** User Interface ***/
@@ -139,6 +139,16 @@ contract CCollateralCapErc20CheckRepay is CTokenCheckRepay, CCollateralCapErc20I
     }
 
     /**
+     * @notice Set the flash loan lender.
+     * @param lender The flash loan lender which is the only caller could call flashloan
+     */
+    function _setFlashloanLender(address lender) external {
+        require(msg.sender == admin, "admin only");
+
+        flashloanLender = lender;
+    }
+
+    /**
      * @notice Absorb excess cash into reserves.
      */
     function gulp() external nonReentrant {
@@ -190,6 +200,7 @@ contract CCollateralCapErc20CheckRepay is CTokenCheckRepay, CCollateralCapErc20I
         bytes calldata data
     ) external nonReentrant returns (bool) {
         require(amount > 0, "invalid flashloan amount");
+        require(msg.sender == flashloanLender, "flashloan lender only");
         accrueInterest();
         require(
             ComptrollerInterfaceExtension(address(comptroller)).flashloanAllowed(
@@ -288,7 +299,7 @@ contract CCollateralCapErc20CheckRepay is CTokenCheckRepay, CCollateralCapErc20I
      * @return The quantity of underlying tokens owned by this contract
      */
     function getCashOnChain() internal view returns (uint256) {
-        EIP20Interface token = EIP20Interface(underlying);
+        BEP20Interface token = BEP20Interface(underlying);
         return token.balanceOf(address(this));
     }
 
@@ -333,7 +344,7 @@ contract CCollateralCapErc20CheckRepay is CTokenCheckRepay, CCollateralCapErc20I
         isNative; // unused
 
         EIP20NonStandardInterface token = EIP20NonStandardInterface(underlying);
-        uint256 balanceBefore = EIP20Interface(underlying).balanceOf(address(this));
+        uint256 balanceBefore = BEP20Interface(underlying).balanceOf(address(this));
         token.transferFrom(from, address(this), amount);
 
         bool success;
@@ -356,7 +367,7 @@ contract CCollateralCapErc20CheckRepay is CTokenCheckRepay, CCollateralCapErc20I
         require(success, "transfer failed");
 
         // Calculate the amount that was *actually* transferred
-        uint256 balanceAfter = EIP20Interface(underlying).balanceOf(address(this));
+        uint256 balanceAfter = BEP20Interface(underlying).balanceOf(address(this));
         uint256 transferredIn = sub_(balanceAfter, balanceBefore);
         internalCash = add_(internalCash, transferredIn);
         return transferredIn;

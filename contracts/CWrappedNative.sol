@@ -43,7 +43,7 @@ contract CWrappedNative is CToken, CWrappedNativeInterface {
 
         // Set underlying and sanity check it
         underlying = underlying_;
-        EIP20Interface(underlying).totalSupply();
+        BEP20Interface(underlying).totalSupply();
         WrappedNativeInterface(underlying);
     }
 
@@ -163,6 +163,8 @@ contract CWrappedNative is CToken, CWrappedNativeInterface {
 
     /**
      * @notice Sender repays a borrow belonging to borrower
+     * @dev Accrues interest whether or not the operation succeeds, unless reverted
+     *  Keep return in the function signature for backward compatibility
      * @param borrower the account with the debt being payed off
      * @param repayAmount The amount to repay
      * @return uint 0=success, otherwise a failure (see ErrorReporter.sol for details)
@@ -174,6 +176,8 @@ contract CWrappedNative is CToken, CWrappedNativeInterface {
 
     /**
      * @notice Sender repays a borrow belonging to borrower
+     * @dev Accrues interest whether or not the operation succeeds, unless reverted
+     *  Keep return in the function signature for consistency
      * @param borrower the account with the debt being payed off
      * @return uint 0=success, otherwise a failure (see ErrorReporter.sol for details)
      */
@@ -220,6 +224,16 @@ contract CWrappedNative is CToken, CWrappedNativeInterface {
     }
 
     /**
+     * @notice Set the flash loan lender.
+     * @param lender The flash loan lender which is the only caller could call flashloan
+     */
+    function _setFlashloanLender(address lender) external {
+        require(msg.sender == admin, "admin only");
+
+        flashloanLender = lender;
+    }
+
+    /**
      * @notice Get the max flash loan amount
      */
     function maxFlashLoan() external view returns (uint256) {
@@ -259,6 +273,7 @@ contract CWrappedNative is CToken, CWrappedNativeInterface {
         bytes calldata data
     ) external nonReentrant returns (bool) {
         require(amount > 0, "invalid flashloan amount");
+        require(msg.sender == flashloanLender, "flashloan lender only");
         accrueInterest();
         require(
             ComptrollerInterfaceExtension(address(comptroller)).flashloanAllowed(
@@ -338,7 +353,7 @@ contract CWrappedNative is CToken, CWrappedNativeInterface {
      * @return The quantity of underlying tokens owned by this contract
      */
     function getCashPrior() internal view returns (uint256) {
-        EIP20Interface token = EIP20Interface(underlying);
+        BEP20Interface token = BEP20Interface(underlying);
         return token.balanceOf(address(this));
     }
 
@@ -366,7 +381,7 @@ contract CWrappedNative is CToken, CWrappedNativeInterface {
             return amount;
         } else {
             EIP20NonStandardInterface token = EIP20NonStandardInterface(underlying);
-            uint256 balanceBefore = EIP20Interface(underlying).balanceOf(address(this));
+            uint256 balanceBefore = BEP20Interface(underlying).balanceOf(address(this));
             token.transferFrom(from, address(this), amount);
 
             bool success;
@@ -389,7 +404,7 @@ contract CWrappedNative is CToken, CWrappedNativeInterface {
             require(success, "transfer failed");
 
             // Calculate the amount that was *actually* transferred
-            uint256 balanceAfter = EIP20Interface(underlying).balanceOf(address(this));
+            uint256 balanceAfter = BEP20Interface(underlying).balanceOf(address(this));
             return sub_(balanceAfter, balanceBefore);
         }
     }

@@ -34,7 +34,7 @@ contract CCollateralCapErc20CheckRepayDelegate is CCollateralCapErc20CheckRepay 
         // Set CToken version in comptroller
         ComptrollerInterfaceExtension(address(comptroller)).updateCTokenVersion(
             address(this),
-            ComptrollerV1Storage.Version.COLLATERALCAP
+            ComptrollerV2Storage.Version.COLLATERALCAP
         );
     }
 

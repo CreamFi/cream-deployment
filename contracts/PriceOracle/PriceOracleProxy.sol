@@ -11,7 +11,7 @@ import "./interfaces/YVaultTokenInterface.sol";
 import "../CErc20.sol";
 import "../CToken.sol";
 import "../Exponential.sol";
-import "../EIP20Interface.sol";
+import "../BEP20Interface.sol";
 
 contract PriceOracleProxy is PriceOracle, Exponential, Denominations {
     /// @notice Yvault token version, currently support v1 and v2
@@ -177,7 +177,7 @@ contract PriceOracleProxy is PriceOracle, Exponential, Denominations {
                 // Convert the price to ETH based if it's USD based.
                 price = mul_(price, Exp({mantissa: getUsdcEthPrice()}));
             }
-            uint256 underlyingDecimals = EIP20Interface(token).decimals();
+            uint256 underlyingDecimals = BEP20Interface(token).decimals();
             return mul_(price, 10**(18 - underlyingDecimals));
         }
         return getPriceFromV1(token);

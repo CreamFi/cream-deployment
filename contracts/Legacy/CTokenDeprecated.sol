@@ -4,7 +4,7 @@ import "../ComptrollerInterface.sol";
 import "../CTokenInterfaces.sol";
 import "../ErrorReporter.sol";
 import "../Exponential.sol";
-import "../EIP20Interface.sol";
+import "../BEP20Interface.sol";
 import "../EIP20NonStandardInterface.sol";
 import "../InterestRateModel.sol";
 
@@ -165,6 +165,14 @@ contract CTokenDeprecated is CTokenInterface, Exponential, TokenErrorReporter {
      */
     function allowance(address owner, address spender) external view returns (uint256) {
         return transferAllowances[owner][spender];
+    }
+
+    /**
+     * @notice Get the bep token owner
+     * @return The owner of token
+     */
+    function getOwner() external view returns (address) {
+        return admin;
     }
 
     /**
@@ -717,6 +725,26 @@ contract CTokenDeprecated is CTokenInterface, Exponential, TokenErrorReporter {
         }
         // repayBorrowFresh emits repay-borrow-specific logs on errors, so we don't need to
         return repayBorrowFresh(msg.sender, msg.sender, repayAmount);
+    }
+
+    /**
+     * @notice Sender repays a borrow belonging to borrower
+     * @param borrower the account with the debt being payed off
+     * @param repayAmount The amount to repay
+     * @return (uint, uint) An error code (0=success, otherwise a failure, see ErrorReporter.sol), and the actual repayment amount.
+     */
+    function repayBorrowBehalfInternal(address borrower, uint256 repayAmount)
+        internal
+        nonReentrant
+        returns (uint256, uint256)
+    {
+        uint256 error = accrueInterest();
+        if (error != uint256(Error.NO_ERROR)) {
+            // accrueInterest emits logs on errors, but we still want to log the fact that an attempted borrow failed
+            return (fail(Error(error), FailureInfo.REPAY_BEHALF_ACCRUE_INTEREST_FAILED), 0);
+        }
+        // repayBorrowFresh emits repay-borrow-specific logs on errors, so we don't need to
+        return repayBorrowFresh(msg.sender, borrower, repayAmount);
     }
 
     struct RepayBorrowLocalVars {

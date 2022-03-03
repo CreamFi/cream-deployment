@@ -1,31 +1,21 @@
 pragma solidity ^0.5.16;
 pragma experimental ABIEncoderV2;
 
-import "./Denominations.sol";
 import "./PriceOracle.sol";
 import "./interfaces/BandReference.sol";
-import "./interfaces/FeedRegistryInterface.sol";
+import "./interfaces/UniswapV2Interface.sol";
 import "./interfaces/V1PriceOracleInterface.sol";
 import "../CErc20.sol";
 import "../CToken.sol";
 import "../Exponential.sol";
-import "../EIP20Interface.sol";
+import "../BEP20Interface.sol";
 
-contract PriceOracleProxyIB is PriceOracle, Exponential, Denominations {
+contract PriceOracleProxyBSC is PriceOracle, Exponential {
     /// @notice Admin address
     address public admin;
 
     /// @notice Guardian address
     address public guardian;
-
-    struct AggregatorInfo {
-        /// @notice The base
-        address base;
-        /// @notice The quote denomination
-        address quote;
-        /// @notice It's being used or not.
-        bool isUsed;
-    }
 
     struct ReferenceInfo {
         /// @notice The symbol used in reference
@@ -34,40 +24,42 @@ contract PriceOracleProxyIB is PriceOracle, Exponential, Denominations {
         bool isUsed;
     }
 
-    /// @notice Chainlink Aggregators
-    mapping(address => AggregatorInfo) public aggregators;
-
     /// @notice Band Reference
     mapping(address => ReferenceInfo) public references;
 
-    /// @notice The v1 price oracle, maintain by CREAM
+    /// @notice The v1 price oracle, which will continue to serve prices for v1 assets
     V1PriceOracleInterface public v1PriceOracle;
 
-    /// @notice The ChainLink registry address
-    FeedRegistryInterface public reg;
-
-    /// @notice The BAND reference address
+    /// @notice The BAND oracle contract
     StdReferenceInterface public ref;
 
+    /// @notice Check if the underlying address is Pancakeswap LP
+    mapping(address => bool) public isUnderlyingLP;
+
+    /// @notice crBNB address that has a constant price of 1e18
+    address public cBnbAddress;
+
     /// @notice Quote symbol we used for BAND reference contract
-    string public constant QUOTE_SYMBOL = "USD";
+    string public constant QUOTE_SYMBOL = "BNB";
+
+    address public constant wbnbAddress = 0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c;
 
     /**
-     * @param admin_ The address of admin to set aggregators
-     * @param v1PriceOracle_ The v1 price oracle
-     * @param registry_ The address of ChainLink registry
-     * @param reference_ The address of Band reference
+     * @param admin_ The address of admin to set underlying symbols for BAND oracle
+     * @param v1PriceOracle_ The address of the v1 price oracle, which will continue to operate and hold prices for collateral assets
+     * @param reference_ The price reference contract, which will be served for our primary price source on BSC
+     * @param cBnbAddress_ The address of cBNB, which will return a constant 1e18, since all prices relative to bnb
      */
     constructor(
         address admin_,
         address v1PriceOracle_,
-        address registry_,
-        address reference_
+        address reference_,
+        address cBnbAddress_
     ) public {
         admin = admin_;
         v1PriceOracle = V1PriceOracleInterface(v1PriceOracle_);
-        reg = FeedRegistryInterface(registry_);
         ref = StdReferenceInterface(reference_);
+        cBnbAddress = cBnbAddress_;
     }
 
     /**
@@ -76,45 +68,40 @@ contract PriceOracleProxyIB is PriceOracle, Exponential, Denominations {
      * @return The underlying asset price mantissa (scaled by 1e18)
      */
     function getUnderlyingPrice(CToken cToken) public view returns (uint256) {
-        address underlying = CErc20(address(cToken)).underlying();
-
-        // Get price from ChainLink.
-        AggregatorInfo storage aggregatorInfo = aggregators[underlying];
-        if (aggregatorInfo.isUsed) {
-            uint256 price = getPriceFromChainlink(aggregatorInfo.base, aggregatorInfo.quote);
-            if (aggregatorInfo.quote == Denominations.ETH) {
-                // Convert the price to USD based if it's ETH based.
-                uint256 ethUsdPrice = getPriceFromChainlink(Denominations.ETH, Denominations.USD);
-                price = mul_(price, Exp({mantissa: ethUsdPrice}));
-            }
-            return getNormalizedPrice(price, underlying);
+        address cTokenAddress = address(cToken);
+        if (cTokenAddress == cBnbAddress) {
+            // bnb always worth 1
+            return 1e18;
         }
 
-        // Get price from Band.
-        ReferenceInfo storage referenceInfo = references[underlying];
-        if (referenceInfo.isUsed) {
-            uint256 price = getPriceFromBAND(referenceInfo.symbol);
-            return getNormalizedPrice(price, underlying);
+        address underlying = CErc20(cTokenAddress).underlying();
+        if (isUnderlyingLP[underlying]) {
+            return getLPFairPrice(underlying);
         }
 
-        // Get price from v1.
-        return getPriceFromV1(underlying);
+        return getTokenPrice(underlying);
     }
 
     /*** Internal fucntions ***/
 
     /**
-     * @notice Get price from ChainLink
-     * @param base The base token that ChainLink aggregator gets the price of
-     * @param quote The quote token, currenlty support ETH and USD
-     * @return The price, scaled by 1e18
+     * @notice Get the price of a specific token.
+     * @param token The token to get the price of
+     * @return The price
      */
-    function getPriceFromChainlink(address base, address quote) internal view returns (uint256) {
-        (, int256 price, , , ) = reg.latestRoundData(base, quote);
-        require(price > 0, "invalid price");
+    function getTokenPrice(address token) internal view returns (uint256) {
+        if (token == wbnbAddress) {
+            // wbnb always worth 1
+            return 1e18;
+        }
 
-        // Extend the decimals to 1e18.
-        return mul_(uint256(price), 10**(18 - uint256(reg.decimals(base, quote))));
+        // Get price from Band.
+        ReferenceInfo storage referenceInfo = references[token];
+        if (referenceInfo.isUsed) {
+            uint256 price = getPriceFromBAND(referenceInfo.symbol);
+            return getNormalizedPrice(price, token);
+        }
+        return getPriceFromV1(token);
     }
 
     /**
@@ -131,13 +118,31 @@ contract PriceOracleProxyIB is PriceOracle, Exponential, Denominations {
     }
 
     /**
+     * @notice Get the fair price of a LP. We use the mechanism from Alpha Finance.
+     *         Ref: https://blog.alphafinance.io/fair-lp-token-pricing/
+     * @param pair The pair of AMM (Pancakeswap)
+     * @return The price
+     */
+    function getLPFairPrice(address pair) internal view returns (uint256) {
+        address token0 = IUniswapV2Pair(pair).token0();
+        address token1 = IUniswapV2Pair(pair).token1();
+        uint256 totalSupply = IUniswapV2Pair(pair).totalSupply();
+        (uint256 r0, uint256 r1, ) = IUniswapV2Pair(pair).getReserves();
+        uint256 sqrtR = sqrt(mul_(r0, r1));
+        uint256 p0 = getTokenPrice(token0);
+        uint256 p1 = getTokenPrice(token1);
+        uint256 sqrtP = sqrt(mul_(p0, p1));
+        return div_(mul_(2, mul_(sqrtR, sqrtP)), totalSupply);
+    }
+
+    /**
      * @notice Normalize the price according to the token decimals.
      * @param price The original price
      * @param tokenAddress The token address
      * @return The normalized price.
      */
     function getNormalizedPrice(uint256 price, address tokenAddress) internal view returns (uint256) {
-        uint256 underlyingDecimals = EIP20Interface(tokenAddress).decimals();
+        uint256 underlyingDecimals = BEP20Interface(tokenAddress).decimals();
         return mul_(price, 10**(18 - underlyingDecimals));
     }
 
@@ -150,10 +155,10 @@ contract PriceOracleProxyIB is PriceOracle, Exponential, Denominations {
         return v1PriceOracle.assetPrices(token);
     }
 
-    /*** Admin or guardian functions ***/
+    /*** Admin functions ***/
 
-    event AggregatorUpdated(address tokenAddress, address base, address quote, bool isUsed);
     event ReferenceUpdated(address tokenAddress, string symbol, bool isUsed);
+    event IsLPUpdated(address tokenAddress, bool isLP);
     event SetGuardian(address guardian);
     event SetAdmin(address admin);
 
@@ -178,31 +183,21 @@ contract PriceOracleProxyIB is PriceOracle, Exponential, Denominations {
     }
 
     /**
-     * @notice Set ChainLink aggregators for multiple tokens
-     * @param tokenAddresses The list of underlying tokens
-     * @param bases The list of ChainLink aggregator bases
-     * @param quotes The list of ChainLink aggregator quotes, currently support 'ETH' and 'USD'
+     * @notice See assets as LP tokens for multiple tokens
+     * @param tokenAddresses The list of tokens
+     * @param isLP The list of cToken properties (it's LP or not)
      */
-    function _setAggregators(
-        address[] calldata tokenAddresses,
-        address[] calldata bases,
-        address[] calldata quotes
-    ) external {
-        require(msg.sender == admin || msg.sender == guardian, "only the admin or guardian may set the aggregators");
-        require(tokenAddresses.length == bases.length && tokenAddresses.length == quotes.length, "mismatched data");
+    function _setLPs(address[] calldata tokenAddresses, bool[] calldata isLP) external {
+        require(msg.sender == admin, "only the admin may set LPs");
+        require(tokenAddresses.length == isLP.length, "mismatched data");
         for (uint256 i = 0; i < tokenAddresses.length; i++) {
-            bool isUsed;
-            if (bases[i] != address(0)) {
-                require(msg.sender == admin, "guardian may only clear the aggregator");
-                require(quotes[i] == Denominations.ETH || quotes[i] == Denominations.USD, "unsupported denomination");
-                isUsed = true;
-
-                // Make sure the aggregator exists.
-                address aggregator = reg.getFeed(bases[i], quotes[i]);
-                require(reg.isFeedEnabled(aggregator), "aggregator not enabled");
+            isUnderlyingLP[tokenAddresses[i]] = isLP[i];
+            if (isLP[i]) {
+                // Sanity check to make sure the token is LP.
+                IUniswapV2Pair(tokenAddresses[i]).token0();
+                IUniswapV2Pair(tokenAddresses[i]).token1();
             }
-            aggregators[tokenAddresses[i]] = AggregatorInfo({base: bases[i], quote: quotes[i], isUsed: isUsed});
-            emit AggregatorUpdated(tokenAddresses[i], bases[i], quotes[i], isUsed);
+            emit IsLPUpdated(tokenAddresses[i], isLP[i]);
         }
     }
 

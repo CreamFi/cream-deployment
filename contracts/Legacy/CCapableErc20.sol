@@ -32,7 +32,7 @@ contract CCapableErc20 is CToken, CCapableErc20Interface {
 
         // Set underlying and sanity check it
         underlying = underlying_;
-        EIP20Interface(underlying).totalSupply();
+        BEP20Interface(underlying).totalSupply();
     }
 
     /*** User Interface ***/
@@ -197,7 +197,7 @@ contract CCapableErc20 is CToken, CCapableErc20Interface {
      * @return The quantity of underlying tokens owned by this contract
      */
     function getCashOnChain() internal view returns (uint256) {
-        EIP20Interface token = EIP20Interface(underlying);
+        BEP20Interface token = BEP20Interface(underlying);
         return token.balanceOf(address(this));
     }
 
@@ -218,7 +218,7 @@ contract CCapableErc20 is CToken, CCapableErc20Interface {
         isNative; // unused
 
         EIP20NonStandardInterface token = EIP20NonStandardInterface(underlying);
-        uint256 balanceBefore = EIP20Interface(underlying).balanceOf(address(this));
+        uint256 balanceBefore = BEP20Interface(underlying).balanceOf(address(this));
         token.transferFrom(from, address(this), amount);
 
         bool success;
@@ -241,7 +241,7 @@ contract CCapableErc20 is CToken, CCapableErc20Interface {
         require(success, "transfer failed");
 
         // Calculate the amount that was *actually* transferred
-        uint256 balanceAfter = EIP20Interface(underlying).balanceOf(address(this));
+        uint256 balanceAfter = BEP20Interface(underlying).balanceOf(address(this));
         uint256 transferredIn = sub_(balanceAfter, balanceBefore);
         internalCash = add_(internalCash, transferredIn);
         return transferredIn;

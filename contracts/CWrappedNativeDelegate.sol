@@ -31,7 +31,7 @@ contract CWrappedNativeDelegate is CWrappedNative {
         // Set CToken version in comptroller and convert native token to wrapped token.
         ComptrollerInterfaceExtension(address(comptroller)).updateCTokenVersion(
             address(this),
-            ComptrollerV1Storage.Version.WRAPPEDNATIVE
+            ComptrollerV2Storage.Version.WRAPPEDNATIVE
         );
         uint256 balance = address(this).balance;
         if (balance > 0) {

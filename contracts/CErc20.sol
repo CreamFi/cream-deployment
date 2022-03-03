@@ -32,7 +32,7 @@ contract CErc20 is CToken, CErc20Interface {
 
         // Set underlying and sanity check it
         underlying = underlying_;
-        EIP20Interface(underlying).totalSupply();
+        BEP20Interface(underlying).totalSupply();
     }
 
     /*** User Interface ***/
@@ -132,7 +132,7 @@ contract CErc20 is CToken, CErc20Interface {
      * @return The quantity of underlying tokens owned by this contract
      */
     function getCashPrior() internal view returns (uint256) {
-        EIP20Interface token = EIP20Interface(underlying);
+        BEP20Interface token = BEP20Interface(underlying);
         return token.balanceOf(address(this));
     }
 
@@ -153,7 +153,7 @@ contract CErc20 is CToken, CErc20Interface {
         isNative; // unused
 
         EIP20NonStandardInterface token = EIP20NonStandardInterface(underlying);
-        uint256 balanceBefore = EIP20Interface(underlying).balanceOf(address(this));
+        uint256 balanceBefore = BEP20Interface(underlying).balanceOf(address(this));
         token.transferFrom(from, address(this), amount);
 
         bool success;
@@ -176,7 +176,7 @@ contract CErc20 is CToken, CErc20Interface {
         require(success, "transfer failed");
 
         // Calculate the amount that was *actually* transferred
-        uint256 balanceAfter = EIP20Interface(underlying).balanceOf(address(this));
+        uint256 balanceAfter = BEP20Interface(underlying).balanceOf(address(this));
         return sub_(balanceAfter, balanceBefore);
     }
 
