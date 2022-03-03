@@ -829,7 +829,7 @@ contract ComptrollerG1 is ComptrollerV1Storage, ComptrollerInterface, Comptrolle
         )
     {
         // If credit limit is set to MAX, no need to check account liquidity.
-        if (_creditLimits[account] == uint256(-1)) {
+        if (_oldCreditLimits[account] == uint256(-1)) {
             return (Error.NO_ERROR, uint256(-1), 0);
         }
 
@@ -893,8 +893,8 @@ contract ComptrollerG1 is ComptrollerV1Storage, ComptrollerInterface, Comptrolle
         }
 
         // If credit limit is set, no need to consider collateral.
-        if (_creditLimits[account] > 0) {
-            vars.sumCollateral = _creditLimits[account];
+        if (_oldCreditLimits[account] > 0) {
+            vars.sumCollateral = _oldCreditLimits[account];
         }
 
         // These are safe, as the underflow condition is checked first
@@ -1239,7 +1239,7 @@ contract ComptrollerG1 is ComptrollerV1Storage, ComptrollerInterface, Comptrolle
     function _setCreditLimit(address protocol, uint256 creditLimit) public {
         require(msg.sender == admin, "only admin can set protocol credit limit");
 
-        _creditLimits[protocol] = creditLimit;
+        _oldCreditLimits[protocol] = creditLimit;
         emit CreditLimitChanged(protocol, creditLimit);
     }
 

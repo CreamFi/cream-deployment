@@ -264,6 +264,24 @@ contract CWrappedNativeDelegator is CTokenInterface, CWrappedNativeInterface, CD
     }
 
     /**
+     * @dev CWrappedNative doesn't have the collateral cap functionality. Return the supply cap for
+     * interface consistency.
+     * @return the supply cap of this market
+     */
+    function collateralCap() external view returns (uint256) {
+        delegateToViewAndReturn();
+    }
+
+    /**
+     * @dev CWrappedNative doesn't have the collateral cap functionality. Return the total supply for
+     * interface consistency.
+     * @return the total supply of this market
+     */
+    function totalCollateralTokens() external view returns (uint256) {
+        delegateToViewAndReturn();
+    }
+
+    /**
      * @notice Transfer `amount` tokens from `msg.sender` to `dst`
      * @param dst The address of the destination account
      * @param amount The number of tokens to transfer
