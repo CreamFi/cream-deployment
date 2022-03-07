@@ -138,16 +138,6 @@ contract CCollateralCapErc20 is CToken, CCollateralCapErc20Interface {
     }
 
     /**
-     * @notice Set the flash loan lender.
-     * @param lender The flash loan lender which is the only caller could call flashloan
-     */
-    function _setFlashloanLender(address lender) external {
-        require(msg.sender == admin, "admin only");
-
-        flashloanLender = lender;
-    }
-
-    /**
      * @notice Absorb excess cash into reserves.
      */
     function gulp() external nonReentrant {
@@ -160,11 +150,14 @@ contract CCollateralCapErc20 is CToken, CCollateralCapErc20Interface {
     }
 
     /**
-     * @notice Get the max flash loan amount
+     * @dev The amount of currency available to be lent.
+     * @param token The loan currency.
+     * @return The amount of `token` that can be borrowed.
      */
-    function maxFlashLoan() external view returns (uint256) {
+    function maxFlashLoan(address token) external view returns (uint256) {
         uint256 amount = 0;
         if (
+            token == underlying &&
             ComptrollerInterfaceExtension(address(comptroller)).flashloanAllowed(address(this), address(0), amount, "")
         ) {
             amount = getCashPrior();
@@ -174,32 +167,35 @@ contract CCollateralCapErc20 is CToken, CCollateralCapErc20Interface {
 
     /**
      * @notice Get the flash loan fees
+     * @param token The loan currency. Must match the address of this contract's underlying.
      * @param amount amount of token to borrow
+     * @return The amount of `token` to be charged for the loan, on top of the returned principal.
      */
-    function flashFee(uint256 amount) external view returns (uint256) {
+    function flashFee(address token, uint256 amount) external view returns (uint256) {
+        require(token == underlying, "unsupported currency");
         require(
             ComptrollerInterfaceExtension(address(comptroller)).flashloanAllowed(address(this), address(0), amount, ""),
             "flashloan is paused"
         );
-        return div_(mul_(amount, flashFeeBips), 10000);
+        return _flashFee(token, amount);
     }
 
     /**
      * @notice Flash loan funds to a given account.
      * @param receiver The receiver address for the funds
-     * @param initiator flash loan initiator
+     * @param token The loan currency. Must match the address of this contract's underlying.
      * @param amount The amount of the funds to be loaned
      * @param data The other data
      * @return uint 0=success, otherwise a failure (see ErrorReporter.sol for details)
      */
     function flashLoan(
         ERC3156FlashBorrowerInterface receiver,
-        address initiator,
+        address token,
         uint256 amount,
         bytes calldata data
     ) external nonReentrant returns (bool) {
         require(amount > 0, "invalid flashloan amount");
-        require(msg.sender == flashloanLender, "flashloan lender only");
+        require(token == underlying, "unsupported currency");
         accrueInterest();
         require(
             ComptrollerInterfaceExtension(address(comptroller)).flashloanAllowed(
@@ -215,7 +211,7 @@ contract CCollateralCapErc20 is CToken, CCollateralCapErc20Interface {
         require(cashBefore >= amount, "INSUFFICIENT_LIQUIDITY");
 
         // 1. calculate fee, 1 bips = 1/10000
-        uint256 totalFee = this.flashFee(amount);
+        uint256 totalFee = _flashFee(token, amount);
 
         // 2. transfer fund to receiver
         doTransferOut(address(uint160(address(receiver))), amount, false);
@@ -224,9 +220,8 @@ contract CCollateralCapErc20 is CToken, CCollateralCapErc20Interface {
         totalBorrows = add_(totalBorrows, amount);
 
         // 4. execute receiver's callback function
-
         require(
-            receiver.onFlashLoan(initiator, underlying, amount, totalFee, data) ==
+            receiver.onFlashLoan(msg.sender, underlying, amount, totalFee, data) ==
                 keccak256("ERC3156FlashBorrowerInterface.onFlashLoan"),
             "IERC3156: Callback failed"
         );
@@ -247,6 +242,16 @@ contract CCollateralCapErc20 is CToken, CCollateralCapErc20Interface {
 
         emit Flashloan(address(receiver), amount, totalFee, reservesFee);
         return true;
+    }
+
+    /**
+     * @notice Get the flash loan fees
+     * @param token The loan currency. Must match the address of this contract's underlying.
+     * @param amount amount of token to borrow
+     * @return The amount of `token` to be charged for the loan, on top of the returned principal.
+     */
+    function _flashFee(address token, uint256 amount) internal view returns (uint256) {
+        return div_(mul_(amount, flashFeeBips), 10000);
     }
 
     /**
