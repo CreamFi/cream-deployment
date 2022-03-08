@@ -107,4 +107,7 @@ contract ComptrollerV1Storage is UnitrollerAdminStorage {
 
     /// @notice liquidityMining the liquidity mining module that handles the LM rewards distribution.
     address public liquidityMining;
+
+    /// @notice isMarkertDelisted records the market which has been delisted by us.
+    mapping(address => bool) public isMarkertDelisted;
 }

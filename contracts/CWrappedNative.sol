@@ -220,11 +220,14 @@ contract CWrappedNative is CToken, CWrappedNativeInterface {
     }
 
     /**
-     * @notice Get the max flash loan amount
+     * @dev The amount of currency available to be lent.
+     * @param token The loan currency.
+     * @return The amount of `token` that can be borrowed.
      */
-    function maxFlashLoan() external view returns (uint256) {
+    function maxFlashLoan(address token) external view returns (uint256) {
         uint256 amount = 0;
         if (
+            token == underlying &&
             ComptrollerInterfaceExtension(address(comptroller)).flashloanAllowed(address(this), address(0), amount, "")
         ) {
             amount = getCashPrior();
@@ -234,31 +237,35 @@ contract CWrappedNative is CToken, CWrappedNativeInterface {
 
     /**
      * @notice Get the flash loan fees
+     * @param token The loan currency. Must match the address of this contract's underlying.
      * @param amount amount of token to borrow
+     * @return The amount of `token` to be charged for the loan, on top of the returned principal.
      */
-    function flashFee(uint256 amount) external view returns (uint256) {
+    function flashFee(address token, uint256 amount) external view returns (uint256) {
+        require(token == underlying, "unsupported currency");
         require(
             ComptrollerInterfaceExtension(address(comptroller)).flashloanAllowed(address(this), address(0), amount, ""),
             "flashloan is paused"
         );
-        return div_(mul_(amount, flashFeeBips), 10000);
+        return _flashFee(token, amount);
     }
 
     /**
      * @notice Flash loan funds to a given account.
      * @param receiver The receiver address for the funds
-     * @param initiator flash loan initiator
+     * @param token The loan currency. Must match the address of this contract's underlying.
      * @param amount The amount of the funds to be loaned
      * @param data The other data
      * @return uint 0=success, otherwise a failure (see ErrorReporter.sol for details)
      */
     function flashLoan(
         ERC3156FlashBorrowerInterface receiver,
-        address initiator,
+        address token,
         uint256 amount,
         bytes calldata data
     ) external nonReentrant returns (bool) {
         require(amount > 0, "invalid flashloan amount");
+        require(token == underlying, "unsupported currency");
         accrueInterest();
         require(
             ComptrollerInterfaceExtension(address(comptroller)).flashloanAllowed(
@@ -273,7 +280,7 @@ contract CWrappedNative is CToken, CWrappedNativeInterface {
         require(cashBefore >= amount, "INSUFFICIENT_LIQUIDITY");
 
         // 1. calculate fee, 1 bips = 1/10000
-        uint256 totalFee = this.flashFee(amount);
+        uint256 totalFee = _flashFee(token, amount);
 
         // 2. transfer fund to receiver
         doTransferOut(address(uint160(address(receiver))), amount, false);
@@ -283,7 +290,7 @@ contract CWrappedNative is CToken, CWrappedNativeInterface {
 
         // 4. execute receiver's callback function
         require(
-            receiver.onFlashLoan(initiator, underlying, amount, totalFee, data) ==
+            receiver.onFlashLoan(msg.sender, underlying, amount, totalFee, data) ==
                 keccak256("ERC3156FlashBorrowerInterface.onFlashLoan"),
             "IERC3156: Callback failed"
         );
@@ -303,6 +310,34 @@ contract CWrappedNative is CToken, CWrappedNativeInterface {
 
         emit Flashloan(address(receiver), amount, totalFee, reservesFee);
         return true;
+    }
+
+    /**
+     * @notice Get the flash loan fees
+     * @param token The loan currency. Must match the address of this contract's underlying.
+     * @param amount amount of token to borrow
+     * @return The amount of `token` to be charged for the loan, on top of the returned principal.
+     */
+    function _flashFee(address token, uint256 amount) internal view returns (uint256) {
+        return div_(mul_(amount, flashFeeBips), 10000);
+    }
+
+    /**
+     * @dev CWrappedNative doesn't have the collateral cap functionality. Return the supply cap for
+     * interface consistency.
+     * @return the supply cap of this market
+     */
+    function collateralCap() external view returns (uint256) {
+        return ComptrollerInterfaceExtension(address(comptroller)).supplyCaps(address(this));
+    }
+
+    /**
+     * @dev CWrappedNative doesn't have the collateral cap functionality. Return the total supply for
+     * interface consistency.
+     * @return the total supply of this market
+     */
+    function totalCollateralTokens() external view returns (uint256) {
+        return totalSupply;
     }
 
     function() external payable {
@@ -386,7 +421,7 @@ contract CWrappedNative is CToken, CWrappedNativeInterface {
                     revert(0, 0)
                 }
             }
-            require(success, "TOKEN_TRANSFER_IN_FAILED");
+            require(success, "transfer failed");
 
             // Calculate the amount that was *actually* transferred
             uint256 balanceAfter = EIP20Interface(underlying).balanceOf(address(this));
@@ -434,7 +469,7 @@ contract CWrappedNative is CToken, CWrappedNativeInterface {
                     revert(0, 0)
                 }
             }
-            require(success, "TOKEN_TRANSFER_OUT_FAILED");
+            require(success, "transfer failed");
         }
     }
 
@@ -454,7 +489,7 @@ contract CWrappedNative is CToken, CWrappedNativeInterface {
         uint256 tokens
     ) internal returns (uint256) {
         /* Fail if transfer not allowed */
-        require(comptroller.transferAllowed(address(this), src, dst, tokens) == 0, "comptroller rejection");
+        require(comptroller.transferAllowed(address(this), src, dst, tokens) == 0, "rejected");
 
         /* Do not allow self-transfers */
         require(src != dst, "bad input");
@@ -512,7 +547,7 @@ contract CWrappedNative is CToken, CWrappedNativeInterface {
         bool isNative
     ) internal returns (uint256, uint256) {
         /* Fail if mint not allowed */
-        require(comptroller.mintAllowed(address(this), minter, mintAmount) == 0, "comptroller rejection");
+        require(comptroller.mintAllowed(address(this), minter, mintAmount) == 0, "rejected");
 
         /*
          * Return if mintAmount is zero.
@@ -523,7 +558,7 @@ contract CWrappedNative is CToken, CWrappedNativeInterface {
         }
 
         /* Verify market's block number equals current block number */
-        require(accrualBlockNumber == getBlockNumber(), "market not fresh");
+        require(accrualBlockNumber == getBlockNumber(), "market is stale");
 
         MintLocalVars memory vars;
 
@@ -617,7 +652,7 @@ contract CWrappedNative is CToken, CWrappedNativeInterface {
         }
 
         /* Fail if redeem not allowed */
-        require(comptroller.redeemAllowed(address(this), redeemer, vars.redeemTokens) == 0, "comptroller rejection");
+        require(comptroller.redeemAllowed(address(this), redeemer, vars.redeemTokens) == 0, "rejected");
 
         /*
          * Return if redeemTokensIn and redeemAmountIn are zero.
@@ -628,7 +663,7 @@ contract CWrappedNative is CToken, CWrappedNativeInterface {
         }
 
         /* Verify market's block number equals current block number */
-        require(accrualBlockNumber == getBlockNumber(), "market not fresh");
+        require(accrualBlockNumber == getBlockNumber(), "market is stale");
 
         /*
          * We calculate the new total supply and redeemer balance, checking for underflow:
@@ -686,7 +721,7 @@ contract CWrappedNative is CToken, CWrappedNativeInterface {
         /* Fail if seize not allowed */
         require(
             comptroller.seizeAllowed(address(this), seizerToken, liquidator, borrower, seizeTokens) == 0,
-            "comptroller rejection"
+            "rejected"
         );
 
         /*

@@ -4,18 +4,44 @@ import "./CErc20.sol";
 import "./CToken.sol";
 import "./EIP20NonStandardInterface.sol";
 
-contract CTokenAdmin {
+contract CTokenAdmin is Exponential {
+    uint256 public constant timeLock = 2 days;
+
     /// @notice Admin address
     address payable public admin;
 
     /// @notice Reserve manager address
     address payable public reserveManager;
 
+    /// @notice Admin queue
+    mapping(address => mapping(address => uint256)) public adminQueue;
+
+    /// @notice Implementation queue
+    mapping(address => mapping(address => uint256)) public implementationQueue;
+
     /// @notice Emits when a new admin is assigned
     event SetAdmin(address indexed oldAdmin, address indexed newAdmin);
 
     /// @notice Emits when a new reserve manager is assigned
     event SetReserveManager(address indexed oldReserveManager, address indexed newAdmin);
+
+    /// @notice Emits when a new cToken pending admin is queued
+    event PendingAdminQueued(address indexed cToken, address indexed newPendingAdmin, uint256 expiration);
+
+    /// @notice Emits when a new cToken pending admin is cleared
+    event PendingAdminCleared(address indexed cToken, address indexed newPendingAdmin);
+
+    /// @notice Emits when a new cToken pending admin becomes active
+    event PendingAdminChanged(address indexed cToken, address indexed newPendingAdmin);
+
+    /// @notice Emits when a new cToken implementation is queued
+    event ImplementationQueued(address indexed cToken, address indexed newImplementation, uint256 expiration);
+
+    /// @notice Emits when a new cToken implementation is cleared
+    event ImplementationCleared(address indexed cToken, address indexed newImplementation);
+
+    /// @notice Emits when a new cToken implementation becomes active
+    event ImplementationChanged(address indexed cToken, address indexed newImplementation);
 
     /**
      * @dev Throws if called by any account other than the admin.
@@ -38,6 +64,13 @@ contract CTokenAdmin {
     }
 
     /**
+     * @notice Get block timestamp
+     */
+    function getBlockTimestamp() public view returns (uint256) {
+        return block.timestamp;
+    }
+
+    /**
      * @notice Get cToken admin
      * @param cToken The cToken address
      */
@@ -46,11 +79,44 @@ contract CTokenAdmin {
     }
 
     /**
-     * @notice Set cToken pending admin
+     * @notice Queue cToken pending admin
      * @param cToken The cToken address
      * @param newPendingAdmin The new pending admin
      */
-    function _setPendingAdmin(address cToken, address payable newPendingAdmin) external onlyAdmin returns (uint256) {
+    function _queuePendingAdmin(address cToken, address payable newPendingAdmin) external onlyAdmin {
+        require(cToken != address(0) && newPendingAdmin != address(0), "invalid input");
+        require(adminQueue[cToken][newPendingAdmin] == 0, "already in queue");
+        uint256 expiration = add_(getBlockTimestamp(), timeLock);
+        adminQueue[cToken][newPendingAdmin] = expiration;
+
+        emit PendingAdminQueued(cToken, newPendingAdmin, expiration);
+    }
+
+    /**
+     * @notice Clear cToken pending admin
+     * @param cToken The cToken address
+     * @param newPendingAdmin The new pending admin
+     */
+    function _clearPendingAdmin(address cToken, address payable newPendingAdmin) external onlyAdmin {
+        adminQueue[cToken][newPendingAdmin] = 0;
+
+        emit PendingAdminCleared(cToken, newPendingAdmin);
+    }
+
+    /**
+     * @notice Toggle cToken pending admin
+     * @param cToken The cToken address
+     * @param newPendingAdmin The new pending admin
+     */
+    function _togglePendingAdmin(address cToken, address payable newPendingAdmin) external onlyAdmin returns (uint256) {
+        uint256 result = adminQueue[cToken][newPendingAdmin];
+        require(result != 0, "not in queue");
+        require(result <= getBlockTimestamp(), "queue not expired");
+
+        adminQueue[cToken][newPendingAdmin] = 0;
+
+        emit PendingAdminChanged(cToken, newPendingAdmin);
+
         return CTokenInterface(cToken)._setPendingAdmin(newPendingAdmin);
     }
 
@@ -113,17 +179,51 @@ contract CTokenAdmin {
     }
 
     /**
-     * @notice Set cToken new implementation
+     * @notice Queue cToken pending implementation
      * @param cToken The cToken address
-     * @param implementation The new implementation
+     * @param implementation The new pending implementation
+     */
+    function _queuePendingImplementation(address cToken, address implementation) external onlyAdmin {
+        require(cToken != address(0) && implementation != address(0), "invalid input");
+        require(implementationQueue[cToken][implementation] == 0, "already in queue");
+        uint256 expiration = add_(getBlockTimestamp(), timeLock);
+        implementationQueue[cToken][implementation] = expiration;
+
+        emit ImplementationQueued(cToken, implementation, expiration);
+    }
+
+    /**
+     * @notice Clear cToken pending implementation
+     * @param cToken The cToken address
+     * @param implementation The new pending implementation
+     */
+    function _clearPendingImplementation(address cToken, address implementation) external onlyAdmin {
+        implementationQueue[cToken][implementation] = 0;
+
+        emit ImplementationCleared(cToken, implementation);
+    }
+
+    /**
+     * @notice Toggle cToken pending implementation
+     * @param cToken The cToken address
+     * @param implementation The new pending implementation
+     * @param allowResign Allow old implementation to resign or not
      * @param becomeImplementationData The payload data
      */
-    function _setImplementation(
+    function _togglePendingImplementation(
         address cToken,
         address implementation,
         bool allowResign,
         bytes calldata becomeImplementationData
     ) external onlyAdmin {
+        uint256 result = implementationQueue[cToken][implementation];
+        require(result != 0, "not in queue");
+        require(result <= getBlockTimestamp(), "queue not expired");
+
+        implementationQueue[cToken][implementation] = 0;
+
+        emit ImplementationChanged(cToken, implementation);
+
         CDelegatorInterface(cToken)._setImplementation(implementation, allowResign, becomeImplementationData);
     }
 

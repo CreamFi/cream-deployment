@@ -150,11 +150,14 @@ contract CCollateralCapErc20 is CToken, CCollateralCapErc20Interface {
     }
 
     /**
-     * @notice Get the max flash loan amount
+     * @dev The amount of currency available to be lent.
+     * @param token The loan currency.
+     * @return The amount of `token` that can be borrowed.
      */
-    function maxFlashLoan() external view returns (uint256) {
+    function maxFlashLoan(address token) external view returns (uint256) {
         uint256 amount = 0;
         if (
+            token == underlying &&
             ComptrollerInterfaceExtension(address(comptroller)).flashloanAllowed(address(this), address(0), amount, "")
         ) {
             amount = getCashPrior();
@@ -164,31 +167,35 @@ contract CCollateralCapErc20 is CToken, CCollateralCapErc20Interface {
 
     /**
      * @notice Get the flash loan fees
+     * @param token The loan currency. Must match the address of this contract's underlying.
      * @param amount amount of token to borrow
+     * @return The amount of `token` to be charged for the loan, on top of the returned principal.
      */
-    function flashFee(uint256 amount) external view returns (uint256) {
+    function flashFee(address token, uint256 amount) external view returns (uint256) {
+        require(token == underlying, "unsupported currency");
         require(
             ComptrollerInterfaceExtension(address(comptroller)).flashloanAllowed(address(this), address(0), amount, ""),
             "flashloan is paused"
         );
-        return div_(mul_(amount, flashFeeBips), 10000);
+        return _flashFee(token, amount);
     }
 
     /**
      * @notice Flash loan funds to a given account.
      * @param receiver The receiver address for the funds
-     * @param initiator flash loan initiator
+     * @param token The loan currency. Must match the address of this contract's underlying.
      * @param amount The amount of the funds to be loaned
      * @param data The other data
      * @return uint 0=success, otherwise a failure (see ErrorReporter.sol for details)
      */
     function flashLoan(
         ERC3156FlashBorrowerInterface receiver,
-        address initiator,
+        address token,
         uint256 amount,
         bytes calldata data
     ) external nonReentrant returns (bool) {
         require(amount > 0, "invalid flashloan amount");
+        require(token == underlying, "unsupported currency");
         accrueInterest();
         require(
             ComptrollerInterfaceExtension(address(comptroller)).flashloanAllowed(
@@ -204,7 +211,7 @@ contract CCollateralCapErc20 is CToken, CCollateralCapErc20Interface {
         require(cashBefore >= amount, "INSUFFICIENT_LIQUIDITY");
 
         // 1. calculate fee, 1 bips = 1/10000
-        uint256 totalFee = this.flashFee(amount);
+        uint256 totalFee = _flashFee(token, amount);
 
         // 2. transfer fund to receiver
         doTransferOut(address(uint160(address(receiver))), amount, false);
@@ -213,9 +220,8 @@ contract CCollateralCapErc20 is CToken, CCollateralCapErc20Interface {
         totalBorrows = add_(totalBorrows, amount);
 
         // 4. execute receiver's callback function
-
         require(
-            receiver.onFlashLoan(initiator, underlying, amount, totalFee, data) ==
+            receiver.onFlashLoan(msg.sender, underlying, amount, totalFee, data) ==
                 keccak256("ERC3156FlashBorrowerInterface.onFlashLoan"),
             "IERC3156: Callback failed"
         );
@@ -236,6 +242,16 @@ contract CCollateralCapErc20 is CToken, CCollateralCapErc20Interface {
 
         emit Flashloan(address(receiver), amount, totalFee, reservesFee);
         return true;
+    }
+
+    /**
+     * @notice Get the flash loan fees
+     * @param token The loan currency. Must match the address of this contract's underlying.
+     * @param amount amount of token to borrow
+     * @return The amount of `token` to be charged for the loan, on top of the returned principal.
+     */
+    function _flashFee(address token, uint256 amount) internal view returns (uint256) {
+        return div_(mul_(amount, flashFeeBips), 10000);
     }
 
     /**
@@ -264,10 +280,7 @@ contract CCollateralCapErc20 is CToken, CCollateralCapErc20Interface {
         initializeAccountCollateralTokens(account);
 
         require(msg.sender == address(comptroller), "comptroller only");
-        require(
-            comptroller.redeemAllowed(address(this), account, accountCollateralTokens[account]) == 0,
-            "comptroller rejection"
-        );
+        require(comptroller.redeemAllowed(address(this), account, accountCollateralTokens[account]) == 0, "rejected");
 
         decreaseUserCollateralInternal(account, accountCollateralTokens[account]);
     }
@@ -355,7 +368,7 @@ contract CCollateralCapErc20 is CToken, CCollateralCapErc20Interface {
                 revert(0, 0)
             }
         }
-        require(success, "TOKEN_TRANSFER_IN_FAILED");
+        require(success, "transfer failed");
 
         // Calculate the amount that was *actually* transferred
         uint256 balanceAfter = EIP20Interface(underlying).balanceOf(address(this));
@@ -400,7 +413,7 @@ contract CCollateralCapErc20 is CToken, CCollateralCapErc20Interface {
                 revert(0, 0)
             }
         }
-        require(success, "TOKEN_TRANSFER_OUT_FAILED");
+        require(success, "transfer failed");
         internalCash = sub_(internalCash, amount);
     }
 
@@ -439,7 +452,7 @@ contract CCollateralCapErc20 is CToken, CCollateralCapErc20Interface {
          * Since bufferTokens are not collateralized and can be transferred freely, we only check with comptroller
          * whether collateralized tokens can be transferred.
          */
-        require(comptroller.transferAllowed(address(this), src, dst, collateralTokens) == 0, "comptroller rejection");
+        require(comptroller.transferAllowed(address(this), src, dst, collateralTokens) == 0, "rejected");
 
         /* Do not allow self-transfers */
         require(src != dst, "bad input");
@@ -564,7 +577,7 @@ contract CCollateralCapErc20 is CToken, CCollateralCapErc20Interface {
         initializeAccountCollateralTokens(minter);
 
         /* Fail if mint not allowed */
-        require(comptroller.mintAllowed(address(this), minter, mintAmount) == 0, "comptroller rejection");
+        require(comptroller.mintAllowed(address(this), minter, mintAmount) == 0, "rejected");
 
         /*
          * Return if mintAmount is zero.
@@ -575,7 +588,7 @@ contract CCollateralCapErc20 is CToken, CCollateralCapErc20Interface {
         }
 
         /* Verify market's block number equals current block number */
-        require(accrualBlockNumber == getBlockNumber(), "market not fresh");
+        require(accrualBlockNumber == getBlockNumber(), "market is stale");
 
         MintLocalVars memory vars;
 
@@ -689,10 +702,10 @@ contract CCollateralCapErc20 is CToken, CCollateralCapErc20Interface {
         }
 
         /* redeemAllowed might check more than user's liquidity. */
-        require(comptroller.redeemAllowed(address(this), redeemer, collateralTokens) == 0, "comptroller rejection");
+        require(comptroller.redeemAllowed(address(this), redeemer, collateralTokens) == 0, "rejected");
 
         /* Verify market's block number equals current block number */
-        require(accrualBlockNumber == getBlockNumber(), "market not fresh");
+        require(accrualBlockNumber == getBlockNumber(), "market is stale");
 
         /* Reverts if protocol has insufficient cash */
         require(getCashPrior() >= vars.redeemAmount, "insufficient cash");
@@ -755,7 +768,7 @@ contract CCollateralCapErc20 is CToken, CCollateralCapErc20Interface {
         /* Fail if seize not allowed */
         require(
             comptroller.seizeAllowed(address(this), seizerToken, liquidator, borrower, seizeTokens) == 0,
-            "comptroller rejection"
+            "rejected"
         );
 
         /*
