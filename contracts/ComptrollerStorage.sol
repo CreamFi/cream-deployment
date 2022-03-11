@@ -144,4 +144,7 @@ contract ComptrollerV1Storage is UnitrollerAdminStorage {
 
     /// @notice creditLimits allowed specific protocols to borrow and repay specific markets without collateral.
     mapping(address => mapping(address => uint256)) internal _creditLimits;
+
+    /// @notice isMarkertDelisted records the market which has been delisted by us.
+    mapping(address => bool) public isMarkertDelisted;
 }

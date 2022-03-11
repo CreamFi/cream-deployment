@@ -42,7 +42,7 @@ contract CTokenNoInterest is CTokenInterface, Exponential, TokenErrorReporter {
 
         // Set the comptroller
         uint256 err = _setComptroller(comptroller_);
-        require(err == uint256(Error.NO_ERROR), "failed to set comptroller");
+        require(err == uint256(Error.NO_ERROR), "set comptroller failed");
 
         // Initialize block number and borrow index (block number mocks depend on comptroller being set)
         accrualBlockNumber = getBlockNumber();
@@ -50,7 +50,7 @@ contract CTokenNoInterest is CTokenInterface, Exponential, TokenErrorReporter {
 
         // Set the interest rate model (depends on block number / borrow index)
         err = _setInterestRateModelFresh(interestRateModel_);
-        require(err == uint256(Error.NO_ERROR), "failed to set IRM");
+        require(err == uint256(Error.NO_ERROR), "set IRM failed");
 
         name = name_;
         symbol = symbol_;
@@ -700,7 +700,7 @@ contract CTokenNoInterest is CTokenInterface, Exponential, TokenErrorReporter {
         require(borrower != liquidator, "invalid account pair");
 
         /* Fail if repayAmount = 0 or repayAmount = -1 */
-        require(repayAmount > 0 && repayAmount != uint256(-1), "invalid close amount requested");
+        require(repayAmount > 0 && repayAmount != uint256(-1), "invalid amount");
 
         LiquidateBorrowLocalVars memory vars;
 
@@ -718,10 +718,10 @@ contract CTokenNoInterest is CTokenInterface, Exponential, TokenErrorReporter {
             address(cTokenCollateral),
             vars.actualRepayAmount
         );
-        require(vars.amountSeizeError == uint256(Error.NO_ERROR), "failed to calculate seize amount");
+        require(vars.amountSeizeError == uint256(Error.NO_ERROR), "calculate seize amount failed");
 
         /* Revert if borrower collateral token balance < seizeTokens */
-        require(cTokenCollateral.balanceOf(borrower) >= vars.seizeTokens, "LIQUIDATE_SEIZE_TOO_MUCH");
+        require(cTokenCollateral.balanceOf(borrower) >= vars.seizeTokens, "seize too much");
 
         // If this is also the collateral, run seizeInternal to avoid re-entrancy, otherwise make an external call
         uint256 seizeError;
@@ -850,11 +850,7 @@ contract CTokenNoInterest is CTokenInterface, Exponential, TokenErrorReporter {
      * @return uint 0=success, otherwise a failure (see ErrorReporter.sol for details)
      */
     function _setReserveFactor(uint256 newReserveFactorMantissa) external nonReentrant returns (uint256) {
-        uint256 error = accrueInterest();
-        if (error != uint256(Error.NO_ERROR)) {
-            // accrueInterest emits logs on errors, but on top of that we want to log the fact that an attempted reserve factor change failed.
-            return fail(Error(error), FailureInfo.SET_RESERVE_FACTOR_ACCRUE_INTEREST_FAILED);
-        }
+        accrueInterest();
         // _setReserveFactorFresh emits reserve-factor-specific logs on errors, so we don't need to.
         return _setReserveFactorFresh(newReserveFactorMantissa);
     }
@@ -895,14 +891,9 @@ contract CTokenNoInterest is CTokenInterface, Exponential, TokenErrorReporter {
      * @return uint 0=success, otherwise a failure (see ErrorReporter.sol for details)
      */
     function _addReservesInternal(uint256 addAmount, bool isNative) internal nonReentrant returns (uint256) {
-        uint256 error = accrueInterest();
-        if (error != uint256(Error.NO_ERROR)) {
-            // accrueInterest emits logs on errors, but on top of that we want to log the fact that an attempted reduce reserves failed.
-            return fail(Error(error), FailureInfo.ADD_RESERVES_ACCRUE_INTEREST_FAILED);
-        }
-
+        accrueInterest();
         // _addReservesFresh emits reserve-addition-specific logs on errors, so we don't need to.
-        (error, ) = _addReservesFresh(addAmount, isNative);
+        (uint256 error, ) = _addReservesFresh(addAmount, isNative);
         return error;
     }
 
@@ -955,11 +946,7 @@ contract CTokenNoInterest is CTokenInterface, Exponential, TokenErrorReporter {
      * @return uint 0=success, otherwise a failure (see ErrorReporter.sol for details)
      */
     function _reduceReserves(uint256 reduceAmount) external nonReentrant returns (uint256) {
-        uint256 error = accrueInterest();
-        if (error != uint256(Error.NO_ERROR)) {
-            // accrueInterest emits logs on errors, but on top of that we want to log the fact that an attempted reduce reserves failed.
-            return fail(Error(error), FailureInfo.REDUCE_RESERVES_ACCRUE_INTEREST_FAILED);
-        }
+        accrueInterest();
         // _reduceReservesFresh emits reserve-reduction-specific logs on errors, so we don't need to.
         return _reduceReservesFresh(reduceAmount);
     }
@@ -1019,11 +1006,7 @@ contract CTokenNoInterest is CTokenInterface, Exponential, TokenErrorReporter {
      * @return uint 0=success, otherwise a failure (see ErrorReporter.sol for details)
      */
     function _setInterestRateModel(InterestRateModel newInterestRateModel) public returns (uint256) {
-        uint256 error = accrueInterest();
-        if (error != uint256(Error.NO_ERROR)) {
-            // accrueInterest emits logs on errors, but on top of that we want to log the fact that an attempted change of interest rate model failed
-            return fail(Error(error), FailureInfo.SET_INTEREST_RATE_MODEL_ACCRUE_INTEREST_FAILED);
-        }
+        accrueInterest();
         // _setInterestRateModelFresh emits interest-rate-model-update-specific logs on errors, so we don't need to.
         return _setInterestRateModelFresh(newInterestRateModel);
     }

@@ -144,4 +144,6 @@ interface ComptrollerInterfaceExtension {
             uint256,
             uint256
         );
+
+    function supplyCaps(address market) external view returns (uint256);
 }

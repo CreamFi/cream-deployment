@@ -394,6 +394,10 @@ contract CWrappedNativeInterface is CErc20Interface {
     ) external returns (bool);
 
     function _addReservesNative() external payable returns (uint256);
+
+    function collateralCap() external view returns (uint256);
+
+    function totalCollateralTokens() external view returns (uint256);
 }
 
 contract CCapableErc20Interface is CErc20Interface, CSupplyCapStorage {
