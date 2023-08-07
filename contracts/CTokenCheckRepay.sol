@@ -13,9 +13,7 @@ import "./InterestRateModel.sol";
  * @notice Abstract base for CTokens
  * @author Compound
  */
-contract CTokenNoInterest is CTokenInterface, Exponential, TokenErrorReporter {
-    address public constant EVIL_SPELL = 0x560A8E3B79d23b0A525E15C6F3486c6A293DDAd2;
-
+contract CTokenCheckRepay is CTokenInterface, Exponential, TokenErrorReporter {
     /**
      * @notice Initialize the money market
      * @param comptroller_ The address of the Comptroller
@@ -34,7 +32,7 @@ contract CTokenNoInterest is CTokenInterface, Exponential, TokenErrorReporter {
         uint8 decimals_
     ) public {
         require(msg.sender == admin, "admin only");
-        require(accrualBlockNumber == 0 && borrowIndex == 0, "initialized");
+        require(accrualBlockNumber == 0 && borrowIndex == 0, "market may only be initialized once");
 
         // Set initial exchange rate
         initialExchangeRateMantissa = initialExchangeRateMantissa_;
@@ -162,33 +160,19 @@ contract CTokenNoInterest is CTokenInterface, Exponential, TokenErrorReporter {
     }
 
     /**
-     * @notice Function to get the evil spell's debt
-     * @return The debt
-     */
-    function getAlphaDebt() internal view returns (uint256) {
-        return accountBorrows[EVIL_SPELL].principal;
-    }
-
-    /**
      * @notice Returns the current per-block borrow interest rate for this cToken
-     * @dev The total borrows exclude the debts from Alpha
      * @return The borrow interest rate per block, scaled by 1e18
      */
     function borrowRatePerBlock() external view returns (uint256) {
-        return interestRateModel.getBorrowRate(getCashPrior(), sub_(totalBorrows, getAlphaDebt()), totalReserves);
+        return interestRateModel.getBorrowRate(getCashPrior(), totalBorrows, totalReserves);
     }
 
     /**
      * @notice Returns the current per-block supply interest rate for this cToken
-     * @dev The total borrows exclude the debts from Alpha
      * @return The supply interest rate per block, scaled by 1e18
      */
     function supplyRatePerBlock() external view returns (uint256) {
-        uint256 cashPrior = getCashPrior();
-        uint256 borrows = sub_(totalBorrows, getAlphaDebt());
-        uint256 rate = interestRateModel.getSupplyRate(cashPrior, borrows, totalReserves, reserveFactorMantissa);
-        uint256 interest = mul_(rate, sub_(add_(cashPrior, borrows), totalReserves));
-        return div_(interest, sub_(add_(cashPrior, totalBorrows), totalReserves));
+        return interestRateModel.getSupplyRate(getCashPrior(), totalBorrows, totalReserves, reserveFactorMantissa);
     }
 
     /**
@@ -206,7 +190,7 @@ contract CTokenNoInterest is CTokenInterface, Exponential, TokenErrorReporter {
             cashPriorNew = sub_(getCashPrior(), change);
             totalBorrowsNew = add_(totalBorrows, change);
         }
-        return interestRateModel.getBorrowRate(cashPriorNew, sub_(totalBorrowsNew, getAlphaDebt()), totalReserves);
+        return interestRateModel.getBorrowRate(cashPriorNew, totalBorrowsNew, totalReserves);
     }
 
     /**
@@ -225,10 +209,7 @@ contract CTokenNoInterest is CTokenInterface, Exponential, TokenErrorReporter {
             totalBorrowsNew = add_(totalBorrows, change);
         }
 
-        uint256 borrows = sub_(totalBorrowsNew, getAlphaDebt());
-        uint256 rate = interestRateModel.getSupplyRate(cashPriorNew, borrows, totalReserves, reserveFactorMantissa);
-        uint256 interest = mul_(rate, sub_(add_(cashPriorNew, borrows), totalReserves));
-        return div_(interest, sub_(add_(cashPriorNew, totalBorrowsNew), totalReserves));
+        return interestRateModel.getSupplyRate(cashPriorNew, totalBorrowsNew, totalReserves, reserveFactorMantissa);
     }
 
     /**
@@ -265,11 +246,6 @@ contract CTokenNoInterest is CTokenInterface, Exponential, TokenErrorReporter {
      * @return the calculated balance or 0 if error code is non-zero
      */
     function borrowBalanceStoredInternal(address account) internal view returns (uint256) {
-        // The evil spell won't have further borrow interests.
-        if (account == EVIL_SPELL) {
-            return getAlphaDebt();
-        }
-
         /* Get borrowBalance and borrowIndex */
         BorrowSnapshot storage borrowSnapshot = accountBorrows[account];
 
@@ -359,14 +335,9 @@ contract CTokenNoInterest is CTokenInterface, Exponential, TokenErrorReporter {
         uint256 borrowsPrior = totalBorrows;
         uint256 reservesPrior = totalReserves;
         uint256 borrowIndexPrior = borrowIndex;
-        uint256 borrowPriorForInterestCalculation = sub_(borrowsPrior, getAlphaDebt());
 
         /* Calculate the current borrow interest rate */
-        uint256 borrowRateMantissa = interestRateModel.getBorrowRate(
-            cashPrior,
-            borrowPriorForInterestCalculation,
-            reservesPrior
-        );
+        uint256 borrowRateMantissa = interestRateModel.getBorrowRate(cashPrior, borrowsPrior, reservesPrior);
         require(borrowRateMantissa <= borrowRateMaxMantissa, "borrow rate too high");
 
         /* Calculate the number of blocks elapsed since the last accrual */
@@ -382,7 +353,7 @@ contract CTokenNoInterest is CTokenInterface, Exponential, TokenErrorReporter {
          */
 
         Exp memory simpleInterestFactor = mul_(Exp({mantissa: borrowRateMantissa}), blockDelta);
-        uint256 interestAccumulated = mul_ScalarTruncate(simpleInterestFactor, borrowPriorForInterestCalculation);
+        uint256 interestAccumulated = mul_ScalarTruncate(simpleInterestFactor, borrowsPrior);
         uint256 totalBorrowsNew = add_(interestAccumulated, borrowsPrior);
         uint256 totalReservesNew = mul_ScalarTruncateAddUInt(
             Exp({mantissa: reserveFactorMantissa}),
@@ -531,7 +502,7 @@ contract CTokenNoInterest is CTokenInterface, Exponential, TokenErrorReporter {
     function repayBorrowInternal(uint256 repayAmount, bool isNative) internal nonReentrant returns (uint256, uint256) {
         accrueInterest();
         // repayBorrowFresh emits repay-borrow-specific logs on errors, so we don't need to
-        return repayBorrowFresh(msg.sender, msg.sender, repayAmount, isNative);
+        return repayBorrowFresh(msg.sender, msg.sender, repayAmount, isNative, false);
     }
 
     /**
@@ -548,7 +519,7 @@ contract CTokenNoInterest is CTokenInterface, Exponential, TokenErrorReporter {
     ) internal nonReentrant returns (uint256, uint256) {
         accrueInterest();
         // repayBorrowFresh emits repay-borrow-specific logs on errors, so we don't need to
-        return repayBorrowFresh(msg.sender, borrower, repayAmount, isNative);
+        return repayBorrowFresh(msg.sender, borrower, repayAmount, isNative, false);
     }
 
     struct RepayBorrowLocalVars {
@@ -568,13 +539,15 @@ contract CTokenNoInterest is CTokenInterface, Exponential, TokenErrorReporter {
      * @param borrower the account with the debt being payed off
      * @param repayAmount the amount of undelrying tokens being returned
      * @param isNative The amount is in native or not
+     * @param isFromLiquidation The request is from liquidation or not
      * @return (uint, uint) An error code (0=success, otherwise a failure, see ErrorReporter.sol), and the actual repayment amount.
      */
     function repayBorrowFresh(
         address payer,
         address borrower,
         uint256 repayAmount,
-        bool isNative
+        bool isNative,
+        bool isFromLiquidation
     ) internal returns (uint256, uint256) {
         /* Fail if repayBorrow not allowed */
         require(comptroller.repayBorrowAllowed(address(this), payer, borrower, repayAmount) == 0, "rejected");
@@ -609,6 +582,17 @@ contract CTokenNoInterest is CTokenInterface, Exponential, TokenErrorReporter {
          *   it returns the amount actually transferred, in case of a fee.
          */
         vars.actualRepayAmount = doTransferIn(payer, vars.repayAmount, isNative);
+
+        // Only check account liquidity if the request is from liquidation to save gas.
+        if (isFromLiquidation) {
+            // Right after `doTransferIn` and before updating the storage, check the borrower's account liquidity again.
+            // If a reentrant call to another asset is made during transferring AMP in, a second account liquidity check
+            // could help prevent excessive liquidation.
+            (uint256 err, , uint256 shortfall) = ComptrollerInterfaceExtension(address(comptroller))
+                .getAccountLiquidity(borrower);
+            require(err == 0, "failed to get account liquidity");
+            require(shortfall > 0, "borrower has no shortfall");
+        }
 
         /*
          * We calculate the new borrower and total borrow balances, failing on underflow:
@@ -705,7 +689,13 @@ contract CTokenNoInterest is CTokenInterface, Exponential, TokenErrorReporter {
         LiquidateBorrowLocalVars memory vars;
 
         /* Fail if repayBorrow fails */
-        (vars.repayBorrowError, vars.actualRepayAmount) = repayBorrowFresh(liquidator, borrower, repayAmount, isNative);
+        (vars.repayBorrowError, vars.actualRepayAmount) = repayBorrowFresh(
+            liquidator,
+            borrower,
+            repayAmount,
+            isNative,
+            true
+        );
         require(vars.repayBorrowError == uint256(Error.NO_ERROR), "repay borrow failed");
 
         /////////////////////////
@@ -991,8 +981,8 @@ contract CTokenNoInterest is CTokenInterface, Exponential, TokenErrorReporter {
         totalReserves = totalReservesNew;
 
         // doTransferOut reverts if anything goes wrong, since we can't be sure if side effects occurred.
-        // Restrict reducing reserves in wrapped token. Implementations except `CWrappedNative` won't use parameter `isNative`.
-        doTransferOut(admin, reduceAmount, false);
+        // Restrict reducing reserves in native token. Implementations except `CWrappedNative` won't use parameter `isNative`.
+        doTransferOut(admin, reduceAmount, true);
 
         emit ReservesReduced(admin, reduceAmount, totalReservesNew);
 

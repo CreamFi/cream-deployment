@@ -1,15 +1,16 @@
 pragma solidity ^0.5.16;
 
 import "./CToken.sol";
+import "./CTokenCheckRepay.sol";
 import "./ERC3156FlashLenderInterface.sol";
 import "./ERC3156FlashBorrowerInterface.sol";
 
 /**
- * @title Cream's CCollateralCapErc20 Contract
+ * @title Cream's CCollateralCapErc20CheckRepay Contract
  * @notice CTokens which wrap an EIP-20 underlying with collateral cap
  * @author Cream
  */
-contract CCollateralCapErc20 is CToken, CCollateralCapErc20Interface {
+contract CCollateralCapErc20CheckRepay is CTokenCheckRepay, CCollateralCapErc20Interface {
     /**
      * @notice Initialize the new money market
      * @param underlying_ The address of the underlying asset
@@ -47,7 +48,7 @@ contract CCollateralCapErc20 is CToken, CCollateralCapErc20Interface {
      */
     function mint(uint256 mintAmount) external returns (uint256) {
         (uint256 err, ) = mintInternal(mintAmount, false);
-        require(err == 0, "mint failed");
+        return err;
     }
 
     /**
@@ -57,7 +58,7 @@ contract CCollateralCapErc20 is CToken, CCollateralCapErc20Interface {
      * @return uint 0=success, otherwise a failure (see ErrorReporter.sol for details)
      */
     function redeem(uint256 redeemTokens) external returns (uint256) {
-        require(redeemInternal(redeemTokens, false) == 0, "redeem failed");
+        return redeemInternal(redeemTokens, false);
     }
 
     /**
@@ -67,7 +68,7 @@ contract CCollateralCapErc20 is CToken, CCollateralCapErc20Interface {
      * @return uint 0=success, otherwise a failure (see ErrorReporter.sol for details)
      */
     function redeemUnderlying(uint256 redeemAmount) external returns (uint256) {
-        require(redeemUnderlyingInternal(redeemAmount, false) == 0, "redeem underlying failed");
+        return redeemUnderlyingInternal(redeemAmount, false);
     }
 
     /**
@@ -76,7 +77,7 @@ contract CCollateralCapErc20 is CToken, CCollateralCapErc20Interface {
      * @return uint 0=success, otherwise a failure (see ErrorReporter.sol for details)
      */
     function borrow(uint256 borrowAmount) external returns (uint256) {
-        require(borrowInternal(borrowAmount, false) == 0, "borrow failed");
+        return borrowInternal(borrowAmount, false);
     }
 
     /**
@@ -86,7 +87,7 @@ contract CCollateralCapErc20 is CToken, CCollateralCapErc20Interface {
      */
     function repayBorrow(uint256 repayAmount) external returns (uint256) {
         (uint256 err, ) = repayBorrowInternal(repayAmount, false);
-        require(err == 0, "repay failed");
+        return err;
     }
 
     /**
@@ -97,7 +98,7 @@ contract CCollateralCapErc20 is CToken, CCollateralCapErc20Interface {
      */
     function repayBorrowBehalf(address borrower, uint256 repayAmount) external returns (uint256) {
         (uint256 err, ) = repayBorrowBehalfInternal(borrower, repayAmount, false);
-        require(err == 0, "repay behalf failed");
+        return err;
     }
 
     /**
@@ -114,7 +115,7 @@ contract CCollateralCapErc20 is CToken, CCollateralCapErc20Interface {
         CTokenInterface cTokenCollateral
     ) external returns (uint256) {
         (uint256 err, ) = liquidateBorrowInternal(borrower, repayAmount, cTokenCollateral, false);
-        require(err == 0, "liquidate borrow failed");
+        return err;
     }
 
     /**
@@ -123,7 +124,7 @@ contract CCollateralCapErc20 is CToken, CCollateralCapErc20Interface {
      * @return uint 0=success, otherwise a failure (see ErrorReporter.sol for details)
      */
     function _addReserves(uint256 addAmount) external returns (uint256) {
-        require(_addReservesInternal(addAmount, false) == 0, "add reserves failed");
+        return _addReservesInternal(addAmount, false);
     }
 
     /**
@@ -321,7 +322,7 @@ contract CCollateralCapErc20 is CToken, CCollateralCapErc20Interface {
          * access accountTokens to call this function to check if accountCollateralTokens needed to be initialized.
          */
         if (!isCollateralTokenInit[account]) {
-            if (ComptrollerInterfaceExtension(address(comptroller)).checkMembership(account, CToken(this))) {
+            if (ComptrollerInterfaceExtension(address(comptroller)).checkMembership(account, CToken(address(this)))) {
                 accountCollateralTokens[account] = accountTokens[account];
                 totalCollateralTokens = add_(totalCollateralTokens, accountTokens[account]);
 
@@ -625,7 +626,7 @@ contract CCollateralCapErc20 is CToken, CCollateralCapErc20Interface {
         /*
          * We only allocate collateral tokens if the minter has entered the market.
          */
-        if (ComptrollerInterfaceExtension(address(comptroller)).checkMembership(minter, CToken(this))) {
+        if (ComptrollerInterfaceExtension(address(comptroller)).checkMembership(minter, CToken(address(this)))) {
             increaseUserCollateralInternal(minter, vars.mintTokens);
         }
 

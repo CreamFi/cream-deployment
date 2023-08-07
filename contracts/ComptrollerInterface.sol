@@ -135,4 +135,15 @@ interface ComptrollerInterfaceExtension {
         uint256 amount,
         bytes calldata params
     ) external view returns (bool);
+
+    function getAccountLiquidity(address account)
+        external
+        view
+        returns (
+            uint256,
+            uint256,
+            uint256
+        );
+
+    function supplyCaps(address market) external view returns (uint256);
 }

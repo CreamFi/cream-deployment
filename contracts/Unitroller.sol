@@ -126,6 +126,14 @@ contract Unitroller is UnitrollerAdminStorage, ComptrollerErrorReporter {
     }
 
     /**
+     * @notice This view function is for aligning with EIP-1967 interface
+     * @return The comptroller implementation
+     */
+    function implementation() public view returns (address) {
+        return comptrollerImplementation;
+    }
+
+    /**
      * @dev Delegates execution to an implementation contract.
      * It returns to the external caller whatever the implementation returns
      * or forwards reverts.
