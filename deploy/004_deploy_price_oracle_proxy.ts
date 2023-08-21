@@ -3,13 +3,15 @@ import { DeployFunction } from "hardhat-deploy/types";
 
 const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const { deployments, getNamedAccounts } = hre;
-  const { deploy, execute } = deployments;
+  const { deploy, execute, get } = deployments;
 
   const { deployer, feedRegistry, guardian } = await getNamedAccounts();
 
+  const v1PriceOracleAddress = (await get("PriceOracleV1")).address;
+
   await deploy("PriceOracleProxyUSD", {
     from: deployer,
-    args: [deployer, feedRegistry],
+    args: [deployer, v1PriceOracleAddress, feedRegistry],
     log: true,
   });
 

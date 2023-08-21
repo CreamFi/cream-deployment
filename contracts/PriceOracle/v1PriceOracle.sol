@@ -380,14 +380,14 @@ contract Exponential is ErrorReporter, CarefulMath {
     }
 }
 
-contract PriceOracle is Exponential {
+contract PriceOracleV1 is Exponential {
     /**
      * @dev flag for whether or not contract is paused
      *
      */
     bool public paused;
 
-    uint256 public constant numBlocksPerPeriod = 240; // approximately 1 hour: 60 seconds/minute * 60 minutes/hour * 1 block/15 seconds
+    uint256 public constant numBlocksPerPeriod = 300; // approximately 1 hour: 60 seconds/minute * 60 minutes/hour * 1 block/12 seconds
 
     uint256 public constant maxSwingMantissa = (10**17); // 0.1
 

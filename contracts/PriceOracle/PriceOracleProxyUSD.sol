@@ -4,6 +4,7 @@ pragma experimental ABIEncoderV2;
 import "./Denominations.sol";
 import "./PriceOracle.sol";
 import "./interfaces/FeedRegistryInterface.sol";
+import "./interfaces/V1PriceOracleInterface.sol";
 import "../CErc20.sol";
 import "../CToken.sol";
 import "../Exponential.sol";
@@ -28,6 +29,9 @@ contract PriceOracleProxyUSD is PriceOracle, Exponential, Denominations {
     /// @notice Chainlink Aggregators
     mapping(address => AggregatorInfo) public aggregators;
 
+    /// @notice The v1 price oracle, maintain by CREAM
+    V1PriceOracleInterface public v1PriceOracle;
+
     /// @notice The ChainLink registry address
     FeedRegistryInterface public reg;
 
@@ -37,9 +41,11 @@ contract PriceOracleProxyUSD is PriceOracle, Exponential, Denominations {
      */
     constructor(
         address admin_,
+        address v1PriceOracle_,
         address registry_
     ) public {
         admin = admin_;
+        v1PriceOracle = V1PriceOracleInterface(v1PriceOracle_);
         reg = FeedRegistryInterface(registry_);
     }
 
@@ -67,6 +73,11 @@ contract PriceOracleProxyUSD is PriceOracle, Exponential, Denominations {
             return getNormalizedPrice(price, underlying);
         }
 
+        // Get price from v1.
+        uint256 v1Price = getPriceFromV1(underlying);
+        if (v1Price > 0) {
+            return v1Price;
+        }
         revert("price not found");
     }
 
@@ -95,6 +106,15 @@ contract PriceOracleProxyUSD is PriceOracle, Exponential, Denominations {
     function getNormalizedPrice(uint256 price, address tokenAddress) internal view returns (uint256) {
         uint256 underlyingDecimals = EIP20Interface(tokenAddress).decimals();
         return mul_(price, 10**(18 - underlyingDecimals));
+    }
+
+     /**
+     * @notice Get price from v1 price oracle
+     * @param token The token to get the price of
+     * @return The price
+     */
+    function getPriceFromV1(address token) internal view returns (uint256) {
+        return v1PriceOracle.assetPrices(token);
     }
 
     /*** Admin or guardian functions ***/
