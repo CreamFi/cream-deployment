@@ -9,7 +9,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 
   await execute("Unitroller", { from: deployer, log: true }, "_setPendingAdmin", admin);
   await execute("PriceOracleProxyUSD", { from: deployer, log: true }, "_setAdmin", admin);
-  await execute("CTokenAdmin", { from: deployer, log: true }, "setAdmin", admin);
+  // await execute("CTokenAdmin", { from: deployer, log: true }, "setAdmin", admin);
 };
 export default func;
 func.tags = ["SetAdmin"];

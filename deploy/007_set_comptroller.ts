@@ -9,7 +9,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const { deployer, guardian } = await getNamedAccounts();
 
   const closeFactor = parseEther("0.5");
-  const liquidationIncentive = parseEther("1.08");
+  const liquidationIncentive = parseEther("1.1");
 
   const priceOracleAddress = (await deployments.get("PriceOracleProxyUSD")).address;
 
@@ -21,4 +21,4 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
 };
 export default func;
 func.tags = ["SetupComptroller"];
-func.dependencies = ["Comptroller", "PriceOracleProxyUSD"];
+// func.dependencies = ["Comptroller", "PriceOracleProxyUSD"];

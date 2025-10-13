@@ -1,16 +1,21 @@
 pragma solidity ^0.5.16;
-pragma experimental ABIEncoderV2;
 
-import "./Denominations.sol";
 import "./PriceOracle.sol";
-import "./interfaces/FeedRegistryInterface.sol";
+import "./interfaces/AggregatorV3Interface.sol";
 import "./interfaces/V1PriceOracleInterface.sol";
 import "../CErc20.sol";
 import "../CToken.sol";
 import "../Exponential.sol";
 import "../EIP20Interface.sol";
 
-contract PriceOracleProxyUSD is PriceOracle, Exponential, Denominations {
+contract PriceOracleProxyUSD is PriceOracle, Exponential {
+    /// @notice ChainLink aggregator base, currently support USD and ETH
+    enum AggregatorBase {
+        USD,
+        ETH,
+        BTC
+    }
+
     /// @notice Admin address
     address public admin;
 
@@ -18,35 +23,37 @@ contract PriceOracleProxyUSD is PriceOracle, Exponential, Denominations {
     address public guardian;
 
     struct AggregatorInfo {
-        /// @notice The base
-        address base;
-        /// @notice The quote denomination
-        address quote;
-        /// @notice It's being used or not.
-        bool isUsed;
+        /// @notice The source address of the aggregator
+        AggregatorV3Interface source;
+        /// @notice The aggregator base
+        AggregatorBase base;
     }
 
     /// @notice Chainlink Aggregators
     mapping(address => AggregatorInfo) public aggregators;
 
-    /// @notice The v1 price oracle, maintain by CREAM
+    /// @notice The v1 price oracle
     V1PriceOracleInterface public v1PriceOracle;
 
-    /// @notice The ChainLink registry address
-    FeedRegistryInterface public reg;
+    /// @notice The ETH-USD aggregator address
+    AggregatorV3Interface public ethUsdAggregator;
+
+    /// @notice The BTC-USD aggregator address
+    AggregatorV3Interface public btcUsdAggregator;
 
     /**
      * @param admin_ The address of admin to set aggregators
-     * @param registry_ The address of ChainLink registry
+     * @param v1PriceOracle_ The v1 price oracle
+     * @param ethUsdAggregator_ The ETH-USD aggregator address
+     * @param btcUsdAggregator_ The BTC-USD aggregator address
      */
-    constructor(
-        address admin_,
-        address v1PriceOracle_,
-        address registry_
-    ) public {
+    constructor(address admin_, address v1PriceOracle_, address ethUsdAggregator_, address btcUsdAggregator_)
+        public
+    {
         admin = admin_;
         v1PriceOracle = V1PriceOracleInterface(v1PriceOracle_);
-        reg = FeedRegistryInterface(registry_);
+        ethUsdAggregator = AggregatorV3Interface(ethUsdAggregator_);
+        btcUsdAggregator = AggregatorV3Interface(btcUsdAggregator_);
     }
 
     /**
@@ -55,71 +62,57 @@ contract PriceOracleProxyUSD is PriceOracle, Exponential, Denominations {
      * @return The underlying asset price mantissa (scaled by 1e18)
      */
     function getUnderlyingPrice(CToken cToken) public view returns (uint256) {
-        address underlying = CErc20(address(cToken)).underlying();
+        address cTokenAddress = address(cToken);
 
-        // Get price from ChainLink.
-        AggregatorInfo storage aggregatorInfo = aggregators[underlying];
-        if (aggregatorInfo.isUsed) {
-            uint256 price = getPriceFromChainlink(aggregatorInfo.base, aggregatorInfo.quote);
-            if (aggregatorInfo.quote == Denominations.ETH) {
+        AggregatorInfo memory aggregatorInfo = aggregators[cTokenAddress];
+        if (address(aggregatorInfo.source) != address(0)) {
+            uint256 price = getPriceFromChainlink(aggregatorInfo.source);
+            if (aggregatorInfo.base == AggregatorBase.ETH) {
                 // Convert the price to USD based if it's ETH based.
-                uint256 ethUsdPrice = getPriceFromChainlink(Denominations.ETH, Denominations.USD);
-                price = mul_(price, Exp({mantissa: ethUsdPrice}));
-            } else if (aggregatorInfo.quote == Denominations.BTC) {
+                price = mul_(price, Exp({mantissa: getPriceFromChainlink(ethUsdAggregator)}));
+            } else if (aggregatorInfo.base == AggregatorBase.BTC) {
                 // Convert the price to USD based if it's BTC based.
-                uint256 btcUsdPrice = getPriceFromChainlink(Denominations.BTC, Denominations.USD);
-                price = mul_(price, Exp({mantissa: btcUsdPrice}));
+                price = mul_(price, Exp({mantissa: getPriceFromChainlink(btcUsdAggregator)}));
             }
-            return getNormalizedPrice(price, underlying);
+            uint256 underlyingDecimals = EIP20Interface(CErc20(cTokenAddress).underlying()).decimals();
+            return mul_(price, 10 ** (18 - underlyingDecimals));
         }
 
-        // Get price from v1.
-        uint256 v1Price = getPriceFromV1(underlying);
-        if (v1Price > 0) {
-            return v1Price;
-        }
-        revert("price not found");
+        return getPriceFromV1(cTokenAddress);
     }
 
-    /*** Internal fucntions ***/
+    /**
+     * Internal fucntions
+     */
 
     /**
      * @notice Get price from ChainLink
-     * @param base The base token that ChainLink aggregator gets the price of
-     * @param quote The quote token, currenlty support ETH and USD
-     * @return The price, scaled by 1e18
+     * @param aggregator The ChainLink aggregator to get the price of
+     * @return The price
      */
-    function getPriceFromChainlink(address base, address quote) internal view returns (uint256) {
-        (, int256 price, , , ) = reg.latestRoundData(base, quote);
+    function getPriceFromChainlink(AggregatorV3Interface aggregator) internal view returns (uint256) {
+        (, int256 price,,,) = aggregator.latestRoundData();
         require(price > 0, "invalid price");
 
         // Extend the decimals to 1e18.
-        return mul_(uint256(price), 10**(18 - uint256(reg.decimals(base, quote))));
+        return mul_(uint256(price), 10 ** (18 - uint256(aggregator.decimals())));
     }
 
     /**
-     * @notice Normalize the price according to the token decimals.
-     * @param price The original price
-     * @param tokenAddress The token address
-     * @return The normalized price.
-     */
-    function getNormalizedPrice(uint256 price, address tokenAddress) internal view returns (uint256) {
-        uint256 underlyingDecimals = EIP20Interface(tokenAddress).decimals();
-        return mul_(price, 10**(18 - underlyingDecimals));
-    }
-
-     /**
      * @notice Get price from v1 price oracle
-     * @param token The token to get the price of
+     * @param cTokenAddress The CToken address
      * @return The price
      */
-    function getPriceFromV1(address token) internal view returns (uint256) {
-        return v1PriceOracle.assetPrices(token);
+    function getPriceFromV1(address cTokenAddress) internal view returns (uint256) {
+        address underlying = CErc20(cTokenAddress).underlying();
+        return v1PriceOracle.assetPrices(underlying);
     }
 
-    /*** Admin or guardian functions ***/
+    /**
+     * Admin or guardian functions
+     */
 
-    event AggregatorUpdated(address tokenAddress, address base, address quote, bool isUsed);
+    event AggregatorUpdated(address cTokenAddress, address source, AggregatorBase base);
     event SetGuardian(address guardian);
     event SetAdmin(address admin);
 
@@ -144,31 +137,25 @@ contract PriceOracleProxyUSD is PriceOracle, Exponential, Denominations {
     }
 
     /**
-     * @notice Set ChainLink aggregators for multiple tokens
-     * @param tokenAddresses The list of underlying tokens
+     * @notice Set ChainLink aggregators for multiple cTokens
+     * @param cTokenAddresses The list of cTokens
+     * @param sources The list of ChainLink aggregator sources
      * @param bases The list of ChainLink aggregator bases
-     * @param quotes The list of ChainLink aggregator quotes, currently support 'ETH' and 'USD'
      */
     function _setAggregators(
-        address[] calldata tokenAddresses,
-        address[] calldata bases,
-        address[] calldata quotes
+        address[] calldata cTokenAddresses,
+        address[] calldata sources,
+        AggregatorBase[] calldata bases
     ) external {
         require(msg.sender == admin || msg.sender == guardian, "only the admin or guardian may set the aggregators");
-        require(tokenAddresses.length == bases.length && tokenAddresses.length == quotes.length, "mismatched data");
-        for (uint256 i = 0; i < tokenAddresses.length; i++) {
-            bool isUsed;
-            if (bases[i] != address(0)) {
+        require(cTokenAddresses.length == sources.length && cTokenAddresses.length == bases.length, "mismatched data");
+        for (uint256 i = 0; i < cTokenAddresses.length; i++) {
+            if (sources[i] != address(0)) {
                 require(msg.sender == admin, "guardian may only clear the aggregator");
-                require(quotes[i] == Denominations.ETH || quotes[i] == Denominations.USD || quotes[i] == Denominations.BTC, "unsupported denomination");
-                isUsed = true;
-
-                // Make sure the aggregator exists.
-                address aggregator = reg.getFeed(bases[i], quotes[i]);
-                require(reg.isFeedEnabled(aggregator), "aggregator not enabled");
             }
-            aggregators[tokenAddresses[i]] = AggregatorInfo({base: bases[i], quote: quotes[i], isUsed: isUsed});
-            emit AggregatorUpdated(tokenAddresses[i], bases[i], quotes[i], isUsed);
+            aggregators[cTokenAddresses[i]] =
+                AggregatorInfo({source: AggregatorV3Interface(sources[i]), base: bases[i]});
+            emit AggregatorUpdated(cTokenAddresses[i], sources[i], bases[i]);
         }
     }
 }
